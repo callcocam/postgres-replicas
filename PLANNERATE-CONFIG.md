@@ -44,15 +44,16 @@ Este documento contém todas as configurações específicas do PostgreSQL para 
 | **PostgreSQL** | v15 |
 | **SO** | Ubuntu 20.04+ |
 
-### Servidor Réplica
+### Servidores Réplicas (até 3)
 
-| Propriedade | Valor |
-|-------------|-------|
-| **IP** | A definir (VM local) |
-| **Porta** | `5432` |
-| **Função** | Somente Leitura |
-| **PostgreSQL** | v15 |
-| **SO** | Ubuntu 20.04+ |
+| Propriedade | Réplica 1 | Réplica 2 | Réplica 3 |
+|-------------|-----------|-----------|-----------|
+| **IP** | A definir | A definir | A definir |
+| **Porta** | `5432` | `5432` | `5432` |
+| **Função** | Somente Leitura | Somente Leitura | Somente Leitura |
+| **PostgreSQL** | v15 | v15 | v15 |
+| **SO** | Ubuntu 20.04+ | Ubuntu 20.04+ | Ubuntu 20.04+ |
+| **Slot** | plannerate_replica_slot_1 | plannerate_replica_slot_2 | plannerate_replica_slot_3 |
 
 ---
 
@@ -145,12 +146,13 @@ Uso: Ambiente de produção
 - **Modo**: Assíncrono
 - **Hot Standby**: Habilitado (réplicas aceitam consultas SELECT)
 
-### Slot de Replicação
+### Slots de Replicação
 
 ```bash
-Nome: plannerate_replica_slot
-Tipo: Physical
-Status: Ativo
+# Até 3 réplicas suportadas
+Réplica 1: plannerate_replica_slot_1 (Physical)
+Réplica 2: plannerate_replica_slot_2 (Physical)
+Réplica 3: plannerate_replica_slot_3 (Physical)
 ```
 
 ### Configurações WAL

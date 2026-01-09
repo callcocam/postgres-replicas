@@ -374,11 +374,16 @@ create_database "$DB_PRODUCTION" "Production"
 progress "9" "10" "Configurando replicação..."
 
 sudo -u postgres psql -v ON_ERROR_STOP=1 <<EOF > /dev/null 2>&1
--- Criar slot de replicação física
-SELECT pg_create_physical_replication_slot('$REPLICA_SLOT');
+-- Criar slots de replicação físicos (até 3 réplicas)
+SELECT pg_create_physical_replication_slot('${REPLICA_SLOT}_1');
+SELECT pg_create_physical_replication_slot('${REPLICA_SLOT}_2');
+SELECT pg_create_physical_replication_slot('${REPLICA_SLOT}_3');
 EOF
 
-echo -e "${GREEN}   ✓ Slot de replicação criado: $REPLICA_SLOT${NC}"
+echo -e "${GREEN}   ✓ Slots de replicação criados:${NC}"
+echo -e "      • ${REPLICA_SLOT}_1"
+echo -e "      • ${REPLICA_SLOT}_2"
+echo -e "      • ${REPLICA_SLOT}_3"
 
 # ============================================
 # 10. CONFIGURAR FIREWALL

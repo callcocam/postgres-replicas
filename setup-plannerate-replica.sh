@@ -71,6 +71,29 @@ fi
 echo -e "${GREEN}✅ Credenciais carregadas com sucesso!${NC}"
 
 # ============================================
+# ESCOLHER NÚMERO DA RÉPLICA
+# ============================================
+echo ""
+echo -e "${YELLOW}📝 Qual o número desta réplica?${NC}"
+echo -e "  ${CYAN}1${NC} - Primeira réplica (usa slot: ${REPLICA_SLOT}_1)"
+echo -e "  ${CYAN}2${NC} - Segunda réplica (usa slot: ${REPLICA_SLOT}_2)"
+echo -e "  ${CYAN}3${NC} - Terceira réplica (usa slot: ${REPLICA_SLOT}_3)"
+echo ""
+while true; do
+    read -p "Digite o número [1-3]: " REPLICA_NUMBER
+    if [[ "$REPLICA_NUMBER" =~ ^[1-3]$ ]]; then
+        break
+    else
+        echo -e "${RED}Erro: Digite apenas 1, 2 ou 3${NC}"
+    fi
+done
+
+# Atualizar nome do slot com o número da réplica
+REPLICA_SLOT="${REPLICA_SLOT}_${REPLICA_NUMBER}"
+
+echo -e "${GREEN}✅ Configurado como Réplica $REPLICA_NUMBER (slot: $REPLICA_SLOT)${NC}"
+
+# ============================================
 # CONFIGURAÇÕES
 # ============================================
 PG_VERSION="15"
@@ -274,11 +297,14 @@ cat >> $PG_CONF <<EOF
 hot_standby = on
 hot_standby_feedback = on
 
-# Performance para réplicas
-max_connections = 100
-shared_buffers = 256MB
-effective_cache_size = 1GB
-work_mem = 4MB
+# Performance para réplicas (mesmas configurações do primário)
+max_connections = 200
+shared_buffers = 512MB
+effective_cache_size = 2GB
+work_mem = 8MB
+max_worker_processes = 8
+max_parallel_workers_per_gather = 4
+max_parallel_workers = 8
 
 # Logging
 logging_collector = on
