@@ -117,8 +117,12 @@ sudo -u postgres psql -d testdb -c "SELECT * FROM test_replication;"
 
 ```bash
 sudo -u postgres psql -d testdb -c "
-INSERT INTO test_replication (data, hostname, ip_address) 
-VALUES ('Teste de replicação - $(date)', '$(hostname)', '$(hostname -I | awk "{print \$1}")');"
+INSERT INTO test_replication (data, hostname, ip_address)
+SELECT
+    'Teste carga #' || generate_series,
+    '$(hostname)',
+    '$(hostname -I | awk '{print $1}')'
+FROM generate_series(1, 1000);"
 ```
 
 ### 2. Nas Réplicas - Verificar dados:
