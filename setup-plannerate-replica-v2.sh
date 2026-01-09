@@ -245,11 +245,16 @@ chown -R postgres:postgres /var/lib/postgresql/$PG_VERSION/main
 chmod 700 /var/lib/postgresql/$PG_VERSION/main
 
 # Configurar pg_hba.conf para permitir conexões locais e remotas
-PG_HBA="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
-cp $PG_HBA ${PG_HBA}.backup
+# Após pg_basebackup, o pg_hba.conf está no data directory, não em /etc
+PG_HBA="/var/lib/postgresql/$PG_VERSION/main/pg_hba.conf"
+
+# Fazer backup do arquivo original copiado do master
+if [ -f "$PG_HBA" ]; then
+    cp $PG_HBA ${PG_HBA}.backup.$(date +%Y%m%d_%H%M%S)
+fi
 
 cat > $PG_HBA <<EOF
-# PostgreSQL Client Authentication Configuration File
+# PostgreSQL Client Authentication Configuration File - REPLICA
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
 
 # Local connections
@@ -259,7 +264,7 @@ local   all             all                                     md5
 # IPv4 local connections
 host    all             all             127.0.0.1/32            scram-sha-256
 
-# IPv4 remote connections
+# IPv4 remote connections (para acessar réplica remotamente)
 host    all             all             0.0.0.0/0               scram-sha-256
 
 # IPv6 connections
