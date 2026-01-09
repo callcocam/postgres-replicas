@@ -29,7 +29,7 @@ sudo bash setup-plannerate-primary.sh
 ```
 
 **Resultado:**
-- ✅ PostgreSQL 15 instalado
+- ✅ PostgreSQL 17 instalado
 - ✅ 3 databases criados (laravel, plannerate_staging, plannerate_production)
 - ✅ Usuários criados com senhas seguras
 - ✅ Credenciais salvas em `.plannerate-credentials.txt`
@@ -50,7 +50,7 @@ sudo bash setup-plannerate-replica.sh
 ```
 
 **Resultado:**
-- ✅ PostgreSQL 15 instalado
+- ✅ PostgreSQL 17 instalado
 - ✅ Dados sincronizados do primário
 - ✅ Configurada como read-only
 - ✅ Streaming replication ativo

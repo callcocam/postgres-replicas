@@ -96,7 +96,7 @@ echo -e "${GREEN}✅ Configurado como Réplica $REPLICA_NUMBER (slot: $REPLICA_S
 # ============================================
 # CONFIGURAÇÕES
 # ============================================
-PG_VERSION="15"
+PG_VERSION="17"
 PRIMARY_PORT="${PRIMARY_PORT:-5432}"
 
 # ============================================

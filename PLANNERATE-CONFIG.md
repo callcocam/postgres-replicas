@@ -41,7 +41,7 @@ Este documento contém todas as configurações específicas do PostgreSQL para 
 | **IP** | `192.168.2.106` |
 | **Porta** | `5432` |
 | **Função** | Leitura + Escrita |
-| **PostgreSQL** | v15 |
+| **PostgreSQL** | v17 |
 | **SO** | Ubuntu 20.04+ |
 
 ### Servidores Réplicas (até 3)
@@ -51,7 +51,7 @@ Este documento contém todas as configurações específicas do PostgreSQL para 
 | **IP** | A definir | A definir | A definir |
 | **Porta** | `5432` | `5432` | `5432` |
 | **Função** | Somente Leitura | Somente Leitura | Somente Leitura |
-| **PostgreSQL** | v15 | v15 | v15 |
+| **PostgreSQL** | v17 | v17 | v17 |
 | **SO** | Ubuntu 20.04+ | Ubuntu 20.04+ | Ubuntu 20.04+ |
 | **Slot** | plannerate_replica_slot_1 | plannerate_replica_slot_2 | plannerate_replica_slot_3 |
 

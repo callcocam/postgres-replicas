@@ -37,7 +37,7 @@ fi
 # ============================================
 # CONFIGURAÇÕES FIXAS DO PLANNERATE
 # ============================================
-PG_VERSION="15"
+PG_VERSION="17"
 PRIMARY_IP="192.168.2.106"
 
 # Usuários
