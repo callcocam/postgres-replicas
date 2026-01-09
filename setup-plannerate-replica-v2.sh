@@ -23,10 +23,32 @@ PG_VERSION="17"
 #==========================================
 # LER CREDENCIAIS DO ARQUIVO
 #==========================================
-CREDENTIALS_FILE="$HOME/.plannerate-credentials.txt"
+# Procurar arquivo em múltiplos locais
+CREDENTIALS_FILE=""
 
-if [ ! -f "$CREDENTIALS_FILE" ]; then
+# 1. No diretório atual
+if [ -f "./.plannerate-credentials.txt" ]; then
+    CREDENTIALS_FILE="./.plannerate-credentials.txt"
+# 2. No home do usuário que chamou sudo
+elif [ -n "$SUDO_USER" ] && [ -f "/home/$SUDO_USER/.plannerate-credentials.txt" ]; then
+    CREDENTIALS_FILE="/home/$SUDO_USER/.plannerate-credentials.txt"
+# 3. No home do usuário atual
+elif [ -f "$HOME/.plannerate-credentials.txt" ]; then
+    CREDENTIALS_FILE="$HOME/.plannerate-credentials.txt"
+# 4. No diretório do script
+elif [ -f "$(dirname "$0")/.plannerate-credentials.txt" ]; then
+    CREDENTIALS_FILE="$(dirname "$0")/.plannerate-credentials.txt"
+fi
+
+if [ -z "$CREDENTIALS_FILE" ]; then
     echo -e "${RED}ERRO: Arquivo de credenciais não encontrado!${NC}"
+    echo ""
+    echo "Procurei em:"
+    echo "  - $(pwd)/.plannerate-credentials.txt"
+    if [ -n "$SUDO_USER" ]; then
+        echo "  - /home/$SUDO_USER/.plannerate-credentials.txt"
+    fi
+    echo "  - $HOME/.plannerate-credentials.txt"
     echo ""
     echo "Você precisa copiar o arquivo .plannerate-credentials.txt"
     echo "do servidor PRIMÁRIO para esta máquina."
@@ -36,6 +58,8 @@ if [ ! -f "$CREDENTIALS_FILE" ]; then
     echo ""
     exit 1
 fi
+
+echo -e "${GREEN}Arquivo encontrado: $CREDENTIALS_FILE${NC}"
 
 echo -e "${GREEN}Carregando credenciais...${NC}"
 source $CREDENTIALS_FILE
