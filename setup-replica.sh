@@ -17,24 +17,44 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 #==========================================
-# CONFIGURAÇÃO - AJUSTE ESTES VALORES!
+# CONFIGURAÇÃO INTERATIVA
 #==========================================
-PRIMARY_IP="SUBSTITUA_PELO_IP_DO_PRIMARIO"  # <<< OBRIGATÓRIO: IP do servidor primário
-REPLICA_SLOT="replica1_slot"                # <<< replica1_slot ou replica2_slot
-REPLICATOR_PASSWORD="replicator_password"
-PG_VERSION="15"
+echo -e "${YELLOW}Configuração da Réplica PostgreSQL${NC}"
+echo ""
 
-# Validar configuração
-if [ "$PRIMARY_IP" == "SUBSTITUA_PELO_IP_DO_PRIMARIO" ]; then
-    echo -e "${RED}ERRO: Configure o PRIMARY_IP no início deste script!${NC}"
-    echo ""
-    echo "Edite o script e substitua:"
-    echo "  PRIMARY_IP=\"SUBSTITUA_PELO_IP_DO_PRIMARIO\""
-    echo "Por:"
-    echo "  PRIMARY_IP=\"192.168.1.XXX\"  (IP real do servidor primário)"
-    echo ""
-    exit 1
-fi
+# Solicitar IP do servidor primário
+while true; do
+    read -p "Informe o IP do servidor PRIMÁRIO: " PRIMARY_IP
+    if [[ -z "$PRIMARY_IP" ]]; then
+        echo -e "${RED}Erro: IP não pode estar vazio!${NC}"
+    elif [[ ! "$PRIMARY_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo -e "${RED}Erro: IP inválido! Use o formato: 192.168.1.100${NC}"
+    else
+        break
+    fi
+done
+
+# Solicitar nome do slot de replicação
+echo ""
+echo "Nome do slot de replicação:"
+echo "  - Use 'replica1_slot' para a primeira réplica"
+echo "  - Use 'replica2_slot' para a segunda réplica"
+while true; do
+    read -p "Informe o nome do slot (replica1_slot ou replica2_slot): " REPLICA_SLOT
+    if [[ -z "$REPLICA_SLOT" ]]; then
+        echo -e "${RED}Erro: Slot não pode estar vazio!${NC}"
+    else
+        break
+    fi
+done
+
+# Solicitar senha do usuário replicator
+echo ""
+read -p "Informe a senha do usuário replicator [replicator_password]: " REPLICATOR_PASSWORD
+REPLICATOR_PASSWORD=${REPLICATOR_PASSWORD:-replicator_password}
+
+# Versão do PostgreSQL (fixo)
+PG_VERSION="15"
 
 # Exibir configuração
 echo -e "${YELLOW}Configuração:${NC}"

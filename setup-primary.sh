@@ -16,12 +16,47 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Definir variáveis
+#==========================================
+# CONFIGURAÇÃO INTERATIVA
+#==========================================
+echo -e "${YELLOW}Configuração do Servidor Primário PostgreSQL${NC}"
+echo ""
+
+# Versão do PostgreSQL (fixo)
 PG_VERSION="15"
-REPLICATOR_PASSWORD="replicator_password"
-DB_NAME="testdb"
 POSTGRES_USER="postgres"
 
+# Solicitar senha para o usuário replicator
+echo "Senha para o usuário de replicação (replicator):"
+while true; do
+    read -p "Informe a senha [replicator_password]: " REPLICATOR_PASSWORD
+    REPLICATOR_PASSWORD=${REPLICATOR_PASSWORD:-replicator_password}
+    if [[ -z "$REPLICATOR_PASSWORD" ]]; then
+        echo -e "${RED}Erro: Senha não pode estar vazia!${NC}"
+    else
+        break
+    fi
+done
+
+# Solicitar senha para o usuário admin postgres
+echo ""
+echo "Senha para o usuário admin (postgres):"
+while true; do
+    read -p "Informe a senha [postgres_admin_password]: " POSTGRES_ADMIN_PASSWORD
+    POSTGRES_ADMIN_PASSWORD=${POSTGRES_ADMIN_PASSWORD:-postgres_admin_password}
+    if [[ -z "$POSTGRES_ADMIN_PASSWORD" ]]; then
+        echo -e "${RED}Erro: Senha não pode estar vazia!${NC}"
+    else
+        break
+    fi
+done
+
+# Solicitar nome do database
+echo ""
+read -p "Nome do database a ser criado [testdb]: " DB_NAME
+DB_NAME=${DB_NAME:-testdb}
+
+echo ""
 echo -e "${YELLOW}Este script irá:${NC}"
 echo "  1. Atualizar o sistema"
 echo "  2. Instalar PostgreSQL 15"
@@ -169,7 +204,7 @@ sudo -u postgres psql <<EOF
 CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD '$REPLICATOR_PASSWORD';
 
 -- Alterar senha do usuário postgres para acesso remoto
-ALTER USER postgres WITH PASSWORD 'postgres_admin_password';
+ALTER USER postgres WITH PASSWORD '$POSTGRES_ADMIN_PASSWORD';
 
 -- Criar database de teste
 CREATE DATABASE $DB_NAME;
@@ -253,7 +288,7 @@ echo "  Porta: 5432"
 echo ""
 echo -e "${YELLOW}Credenciais PostgreSQL:${NC}"
 echo "  Usuário Admin: postgres"
-echo "  Senha Admin: postgres_admin_password"
+echo "  Senha Admin: $POSTGRES_ADMIN_PASSWORD"
 echo "  Usuário Replicação: replicator"
 echo "  Senha Replicação: $REPLICATOR_PASSWORD"
 echo "  Database: $DB_NAME"
