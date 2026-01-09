@@ -1,0 +1,29 @@
+# ============================================
+# PLANNERATE - PostgreSQL .gitignore
+# ============================================
+# Nunca commitar arquivos sensíveis!
+
+# Credenciais (CRÍTICO!)
+.plannerate-credentials.txt
+*.credentials.txt
+.pgpass
+*.pgpass
+
+# Backups
+backups/
+*.backup
+*.dump
+*.sql
+*.tar.gz
+*.zip
+
+# Logs temporários
+*.log
+*.log.*
+
+# Arquivos temporários
+*.tmp
+*.swp
+*~
+.DS_Store
+
