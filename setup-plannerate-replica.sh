@@ -199,16 +199,16 @@ systemctl stop postgresql 2>/dev/null || true
 apt install -y -qq postgresql-$PG_VERSION postgresql-contrib-$PG_VERSION postgresql-client-$PG_VERSION > /dev/null 2>&1
 echo -e "${GREEN}   ✓ PostgreSQL instalado${NC}"
 
-# Iniciar uma vez para criar estrutura de diretórios
-systemctl start postgresql 2>/dev/null || true
-sleep 5
-
 # ============================================
 # 5. PARAR E LIMPAR POSTGRESQL
 # ============================================
 progress "5" "9" "Preparando diretório de dados..."
 
-systemctl stop postgresql
+# Verificar se cluster existe, se sim, remover (será recriado via pg_basebackup)
+if [ -d "/etc/postgresql/$PG_VERSION/main" ]; then
+    systemctl stop postgresql 2>/dev/null || true
+    pg_dropcluster --stop $PG_VERSION main 2>/dev/null || true
+fi
 
 PG_DATA="/var/lib/postgresql/$PG_VERSION/main"
 

@@ -168,21 +168,25 @@ fi
 apt install -y -qq postgresql-$PG_VERSION postgresql-contrib-$PG_VERSION postgresql-client-$PG_VERSION > /dev/null 2>&1
 echo -e "${GREEN}   ✓ PostgreSQL instalado${NC}"
 
-# Iniciar uma vez para criar estrutura de diretórios
-systemctl start postgresql 2>/dev/null || true
-sleep 5
-
 # ============================================
-# 5. PARAR POSTGRESQL PARA CONFIGURAÇÃO
+# 5. CRIAR E CONFIGURAR CLUSTER POSTGRESQL
 # ============================================
 progress "5" "10" "Configurando PostgreSQL..."
-
-systemctl stop postgresql
 
 # Caminhos de configuração
 PG_CONF="/etc/postgresql/$PG_VERSION/main/postgresql.conf"
 PG_HBA="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
 PG_DATA="/var/lib/postgresql/$PG_VERSION/main"
+
+# Verificar se cluster existe, se não, criar
+if [ ! -d "/etc/postgresql/$PG_VERSION/main" ]; then
+    echo -e "${YELLOW}   Criando cluster PostgreSQL...${NC}"
+    pg_createcluster $PG_VERSION main --start > /dev/null 2>&1 || true
+    sleep 3
+fi
+
+# Parar para configurar
+systemctl stop postgresql
 
 # Backup dos arquivos originais
 if [ -f "$PG_CONF" ]; then

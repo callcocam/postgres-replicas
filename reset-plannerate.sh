@@ -112,12 +112,18 @@ remove_postgres() {
         systemctl disable postgresql 2>/dev/null || true
     fi
     
+    # Remover cluster (método correto para Debian/Ubuntu)
+    if [ -d "/etc/postgresql/$PG_VERSION/main" ]; then
+        echo -e "   ${YELLOW}Removendo cluster PostgreSQL...${NC}"
+        pg_dropcluster --stop $PG_VERSION main 2>/dev/null || true
+    fi
+    
     # Remover pacotes
     echo -e "   ${YELLOW}Removendo pacotes...${NC}"
     apt remove --purge -y postgresql-$PG_VERSION postgresql-contrib-$PG_VERSION postgresql-client-$PG_VERSION 2>/dev/null || true
     apt autoremove -y 2>/dev/null || true
     
-    # Remover diretórios
+    # Remover diretórios remanescentes
     echo -e "   ${YELLOW}Removendo diretórios...${NC}"
     rm -rf /var/lib/postgresql/$PG_VERSION
     rm -rf /etc/postgresql/$PG_VERSION
