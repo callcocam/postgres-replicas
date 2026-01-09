@@ -1,38 +1,52 @@
 #!/bin/bash
-# Script para configurar PostgreSQL PRIMÁRIO - PLANNERATE
-# Baseado no setup-primary.sh que FUNCIONA
-# Para máquinas Ubuntu NOVAS sem nada instalado
+# Script para configurar PostgreSQL Primário - Projeto Plannerate
+# Para máquinas Ubuntu NOVAS
 # Execute como root ou com sudo
 
 set -e
 
-echo "======================================"
-echo "  POSTGRESQL PRIMÁRIO - PLANNERATE"
-echo "======================================"
+echo "================================================"
+echo "  PLANNERATE - Configuração PostgreSQL Primário"
+echo "================================================"
 echo ""
 
-# Cores para output
+# Cores
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# Versão do PostgreSQL
-PG_VERSION="17"
-POSTGRES_USER="postgres"
+# Configurações
+PG_VERSION="15"
+PROJECT_NAME="plannerate"
 
-# Gerar senhas seguras automaticamente
-REPLICATOR_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
-POSTGRES_ADMIN_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+# Gerar senhas seguras aleatórias
+generate_password() {
+    openssl rand -base64 32 | tr -d "=+/" | cut -c1-24
+}
 
-echo -e "${YELLOW}Este script irá:${NC}"
-echo "  1. Atualizar o sistema"
-echo "  2. Instalar PostgreSQL 17"
-echo "  3. Criar 3 bancos: laravel, plannerate_staging, plannerate_production"
-echo "  4. Criar 3 slots de replicação"
-echo "  5. Configurar replicação streaming"
-echo "  6. Gerar senhas seguras"
-echo "  7. Salvar credenciais em .plannerate-credentials.txt"
+POSTGRES_ADMIN_PASS=$(generate_password)
+REPLICATOR_PASS=$(generate_password)
+PROD_USER_PASS=$(generate_password)
+STAGING_USER_PASS=$(generate_password)
+
+# Databases
+DB_PRODUCTION="${PROJECT_NAME}_production"
+DB_STAGING="${PROJECT_NAME}_staging"
+USER_PRODUCTION="${PROJECT_NAME}_prod"
+USER_STAGING="${PROJECT_NAME}_staging"
+
+# Verificar se está rodando como root
+if [ "$EUID" -ne 0 ]; then 
+    echo -e "${RED}ERRO: Execute como root ou com sudo${NC}"
+    exit 1
+fi
+
+echo -e "${YELLOW}Projeto: Plannerate${NC}"
+echo -e "${YELLOW}Databases que serão criados:${NC}"
+echo "  - ${DB_PRODUCTION} (produção)"
+echo "  - ${DB_STAGING} (homologação/teste)"
 echo ""
 read -p "Deseja continuar? (s/n): " -n 1 -r
 echo
@@ -41,61 +55,50 @@ if [[ ! $REPLY =~ ^[Ss]$ ]]; then
     exit 1
 fi
 
-# Verificar se está rodando como root
-if [ "$EUID" -ne 0 ]; then 
-    echo -e "${RED}ERRO: Execute como root ou com sudo${NC}"
-    exit 1
-fi
-
 # 1. Atualizar sistema
 echo ""
-echo -e "${GREEN}[1/9] Atualizando sistema...${NC}"
+echo -e "${GREEN}[1/10] Atualizando sistema...${NC}"
 apt update -qq
 apt upgrade -y -qq
 
 # 2. Instalar pacotes essenciais
-echo -e "${GREEN}[2/9] Instalando pacotes essenciais...${NC}"
-apt install -y wget curl gnupg2 lsb-release ca-certificates apt-transport-https software-properties-common
+echo -e "${GREEN}[2/10] Instalando pacotes essenciais...${NC}"
+apt install -y wget curl gnupg2 lsb-release ca-certificates apt-transport-https software-properties-common openssl
 
-# 3. Adicionar repositório oficial do PostgreSQL
-echo -e "${GREEN}[3/9] Adicionando repositório PostgreSQL...${NC}"
+# 3. Adicionar repositório PostgreSQL
+echo -e "${GREEN}[3/10] Adicionando repositório PostgreSQL...${NC}"
 wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
 echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 
-# 4. Atualizar lista de pacotes
-echo -e "${GREEN}[4/9] Atualizando lista de pacotes...${NC}"
+# 4. Atualizar lista
+echo -e "${GREEN}[4/10] Atualizando lista de pacotes...${NC}"
 apt update -qq
 
 # 5. Instalar PostgreSQL
-echo -e "${GREEN}[5/9] Instalando PostgreSQL $PG_VERSION...${NC}"
+echo -e "${GREEN}[5/10] Instalando PostgreSQL $PG_VERSION...${NC}"
 apt install -y postgresql-$PG_VERSION postgresql-contrib-$PG_VERSION postgresql-client-$PG_VERSION
 
-# Aguardar PostgreSQL iniciar
 sleep 3
 
-# 6. Parar PostgreSQL para configuração
-echo -e "${GREEN}[6/9] Configurando PostgreSQL...${NC}"
+# 6. Parar para configuração
+echo -e "${GREEN}[6/10] Configurando PostgreSQL...${NC}"
 systemctl stop postgresql
 
 # Configurar postgresql.conf
 PG_CONF="/etc/postgresql/$PG_VERSION/main/postgresql.conf"
-
-# Backup do arquivo original
 cp $PG_CONF ${PG_CONF}.backup
 
-# Adicionar configurações de replicação
 cat >> $PG_CONF <<EOF
 
 #==========================================
-# CONFIGURAÇÕES DE REPLICAÇÃO - PRIMÁRIO
-# PLANNERATE PROJECT
+# PLANNERATE - CONFIGURAÇÕES DE REPLICAÇÃO
 #==========================================
 
-# WAL (Write-Ahead Logging)
+# WAL
 wal_level = replica
 max_wal_senders = 10
 max_replication_slots = 10
-wal_keep_size = 1GB
+wal_keep_size = 2GB
 
 # Hot Standby
 hot_standby = on
@@ -115,21 +118,24 @@ log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
 log_statement = 'mod'
 log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
 
-# Performance
-shared_buffers = 256MB
-effective_cache_size = 1GB
-maintenance_work_mem = 64MB
+# Performance para Laravel
+shared_buffers = 512MB
+effective_cache_size = 2GB
+maintenance_work_mem = 128MB
 checkpoint_completion_target = 0.9
 wal_buffers = 16MB
 default_statistics_target = 100
 random_page_cost = 1.1
 effective_io_concurrency = 200
-work_mem = 4MB
-min_wal_size = 1GB
-max_wal_size = 4GB
+work_mem = 8MB
+min_wal_size = 2GB
+max_wal_size = 8GB
+max_worker_processes = 4
+max_parallel_workers_per_gather = 2
+max_parallel_workers = 4
 EOF
 
-# Criar diretório de archive
+# Criar diretório archive
 mkdir -p /var/lib/postgresql/$PG_VERSION/main/archive
 chown -R postgres:postgres /var/lib/postgresql/$PG_VERSION/main/archive
 chmod 700 /var/lib/postgresql/$PG_VERSION/main/archive
@@ -138,158 +144,328 @@ chmod 700 /var/lib/postgresql/$PG_VERSION/main/archive
 PG_HBA="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
 cp $PG_HBA ${PG_HBA}.backup
 
-# Adicionar regras de autenticação
 cat >> $PG_HBA <<EOF
 
 #==========================================
-# CONFIGURAÇÕES DE REPLICAÇÃO - PLANNERATE
+# PLANNERATE - AUTENTICAÇÃO
 #==========================================
-# Permitir replicação de qualquer IP
+# Replicação
 host    replication     replicator      0.0.0.0/0               scram-sha-256
-# Permitir conexões normais de qualquer IP
+# Databases de aplicação
+host    ${DB_PRODUCTION}    ${USER_PRODUCTION}    0.0.0.0/0     scram-sha-256
+host    ${DB_STAGING}       ${USER_STAGING}       0.0.0.0/0     scram-sha-256
+# Admin
+host    all             postgres        0.0.0.0/0               scram-sha-256
+# Qualquer outro
 host    all             all             0.0.0.0/0               scram-sha-256
-# IPv6
-host    replication     replicator      ::/0                    scram-sha-256
-host    all             all             ::/0                    scram-sha-256
 EOF
 
 # 7. Iniciar PostgreSQL
-echo -e "${GREEN}[7/9] Iniciando PostgreSQL...${NC}"
+echo -e "${GREEN}[7/10] Iniciando PostgreSQL...${NC}"
 systemctl start postgresql
 systemctl enable postgresql
 
-# Aguardar PostgreSQL iniciar completamente
 sleep 5
 
-# Verificar se está rodando
 if ! systemctl is-active --quiet postgresql; then
-    echo -e "${RED}ERRO: PostgreSQL não iniciou corretamente${NC}"
-    echo "Verifique os logs: journalctl -u postgresql -n 50"
+    echo -e "${RED}ERRO: PostgreSQL não iniciou${NC}"
+    journalctl -u postgresql -n 50
     exit 1
 fi
 
-# 8. Criar usuários e bancos de dados
-echo -e "${GREEN}[8/9] Criando usuários, bancos e slots...${NC}"
+# 8. Criar estrutura de databases
+echo -e "${GREEN}[8/10] Criando databases e usuários...${NC}"
 sudo -u postgres psql <<EOF
+-- Alterar senha do postgres
+ALTER USER postgres WITH PASSWORD '$POSTGRES_ADMIN_PASS';
+
 -- Criar usuário de replicação
-CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD '$REPLICATOR_PASSWORD';
+CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD '$REPLICATOR_PASS';
 
--- Alterar senha do usuário postgres
-ALTER USER postgres WITH PASSWORD '$POSTGRES_ADMIN_PASSWORD';
+-- ========================================
+-- DATABASE DE PRODUÇÃO
+-- ========================================
+CREATE DATABASE ${DB_PRODUCTION};
+CREATE USER ${USER_PRODUCTION} WITH PASSWORD '$PROD_USER_PASS';
+GRANT ALL PRIVILEGES ON DATABASE ${DB_PRODUCTION} TO ${USER_PRODUCTION};
 
--- Criar os 3 bancos do Plannerate
-CREATE DATABASE laravel;
-CREATE DATABASE plannerate_staging;
-CREATE DATABASE plannerate_production;
+\c ${DB_PRODUCTION}
 
--- Criar slots de replicação físicos (3 para até 3 réplicas)
-SELECT pg_create_physical_replication_slot('plannerate_replica_slot_1');
-SELECT pg_create_physical_replication_slot('plannerate_replica_slot_2');
-SELECT pg_create_physical_replication_slot('plannerate_replica_slot_3');
+-- Conceder privilégios no schema public
+GRANT ALL ON SCHEMA public TO ${USER_PRODUCTION};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${USER_PRODUCTION};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${USER_PRODUCTION};
 
--- Verificar slots criados
+-- Criar extensões úteis para Laravel
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
+-- ========================================
+-- DATABASE DE STAGING
+-- ========================================
+\c postgres
+CREATE DATABASE ${DB_STAGING};
+CREATE USER ${USER_STAGING} WITH PASSWORD '$STAGING_USER_PASS';
+GRANT ALL PRIVILEGES ON DATABASE ${DB_STAGING} TO ${USER_STAGING};
+
+\c ${DB_STAGING}
+
+-- Conceder privilégios no schema public
+GRANT ALL ON SCHEMA public TO ${USER_STAGING};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${USER_STAGING};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${USER_STAGING};
+
+-- Criar extensões
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
+-- ========================================
+-- SLOTS DE REPLICAÇÃO
+-- ========================================
+\c postgres
+SELECT pg_create_physical_replication_slot('replica1_slot');
+
+-- Verificar
 SELECT slot_name, slot_type, active FROM pg_replication_slots;
-
--- Verificar configurações
-SELECT name, setting FROM pg_settings 
-WHERE name IN ('wal_level', 'max_wal_senders', 'max_replication_slots', 'listen_addresses', 'max_connections');
 EOF
 
 # 9. Configurar firewall
-echo -e "${GREEN}[9/9] Configurando firewall...${NC}"
-
-# Instalar UFW se não estiver instalado
+echo -e "${GREEN}[9/10] Configurando firewall...${NC}"
 if ! command -v ufw &> /dev/null; then
     apt install -y ufw
 fi
 
-# Configurar regras
 ufw --force enable
 ufw allow 22/tcp comment 'SSH'
-ufw allow 5432/tcp comment 'PostgreSQL'
+ufw allow 5432/tcp comment 'PostgreSQL Plannerate'
 ufw reload
 
-# Obter informações da máquina
+# 10. Gerar arquivos de configuração
+echo -e "${GREEN}[10/10] Gerando arquivos de configuração...${NC}"
+
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
 HOSTNAME=$(hostname)
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
-# Salvar credenciais
-CREDENTIALS_FILE="$HOME/.plannerate-credentials.txt"
-cat > $CREDENTIALS_FILE <<EOF
-#==========================================
-# CREDENCIAIS POSTGRESQL - PLANNERATE
-# Gerado automaticamente em: $(date)
-#==========================================
+# Criar diretório de configurações
+mkdir -p /root/plannerate-config
+cd /root/plannerate-config
 
-# IP do servidor primário
+# ========================================
+# ARQUIVO 1: Configuração para Réplica
+# ========================================
+cat > replica-config.txt <<EOF
+# ================================================
+# PLANNERATE - Configuração para Réplica
+# Gerado em: $TIMESTAMP
+# ================================================
+
 PRIMARY_IP=$IP_ADDRESS
-
-# Credenciais de replicação
-REPLICATOR_USER=replicator
-REPLICATOR_PASSWORD=$REPLICATOR_PASSWORD
-
-# Credenciais admin PostgreSQL
-POSTGRES_USER=postgres
-POSTGRES_ADMIN_PASSWORD=$POSTGRES_ADMIN_PASSWORD
-
-# Bancos de dados
-DB_DEV=laravel
-DB_STAGING=plannerate_staging
-DB_PRODUCTION=plannerate_production
-
-# Slots de replicação
-SLOT_1=plannerate_replica_slot_1
-SLOT_2=plannerate_replica_slot_2
-SLOT_3=plannerate_replica_slot_3
-
-# Versão PostgreSQL
+REPLICATOR_PASSWORD=$REPLICATOR_PASS
+REPLICA_SLOT=replica1_slot
 PG_VERSION=$PG_VERSION
+
+# INSTRUÇÕES:
+# 1. Copie este arquivo para a máquina réplica
+# 2. Coloque no mesmo diretório do setup-plannerate-replica.sh
+# 3. Execute: ./setup-plannerate-replica.sh
 EOF
 
-chmod 600 $CREDENTIALS_FILE
+# ========================================
+# ARQUIVO 2: Laravel .env - PRODUÇÃO
+# ========================================
+cat > laravel-env-production.txt <<EOF
+# ================================================
+# PLANNERATE - Laravel .env (PRODUÇÃO)
+# Gerado em: $TIMESTAMP
+# ================================================
+
+# Database - Produção (Primary Server - Read/Write)
+DB_CONNECTION=pgsql
+DB_HOST=$IP_ADDRESS
+DB_PORT=5432
+DB_DATABASE=${DB_PRODUCTION}
+DB_USERNAME=${USER_PRODUCTION}
+DB_PASSWORD=$PROD_USER_PASS
+
+# Para usar réplica para leitura (após configurar):
+# DB_READ_HOST=IP_DA_REPLICA
+# DB_READ_PORT=5432
+
+# Outras configurações PostgreSQL
+DB_SCHEMA=public
+DB_SSLMODE=prefer
+EOF
+
+# ========================================
+# ARQUIVO 3: Laravel .env - STAGING
+# ========================================
+cat > laravel-env-staging.txt <<EOF
+# ================================================
+# PLANNERATE - Laravel .env (STAGING)
+# Gerado em: $TIMESTAMP
+# ================================================
+
+# Database - Staging (Primary Server - Read/Write)
+DB_CONNECTION=pgsql
+DB_HOST=$IP_ADDRESS
+DB_PORT=5432
+DB_DATABASE=${DB_STAGING}
+DB_USERNAME=${USER_STAGING}
+DB_PASSWORD=$STAGING_USER_PASS
+
+# Outras configurações PostgreSQL
+DB_SCHEMA=public
+DB_SSLMODE=prefer
+EOF
+
+# ========================================
+# ARQUIVO 4: Laravel database.php - Configuração com Réplica
+# ========================================
+cat > laravel-database-config.php <<EOF
+<?php
+// ================================================
+// PLANNERATE - database/database.php
+// Configuração com suporte a réplica de leitura
+// Gerado em: $TIMESTAMP
+// ================================================
+
+return [
+    'default' => env('DB_CONNECTION', 'pgsql'),
+
+    'connections' => [
+        'pgsql' => [
+            'driver' => 'pgsql',
+            'read' => [
+                'host' => [
+                    env('DB_READ_HOST', env('DB_HOST', '127.0.0.1')),
+                ],
+            ],
+            'write' => [
+                'host' => [
+                    env('DB_HOST', '127.0.0.1'),
+                ],
+            ],
+            'sticky' => true,
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_DATABASE', 'forge'),
+            'username' => env('DB_USERNAME', 'forge'),
+            'password' => env('DB_PASSWORD', ''),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+        ],
+    ],
+];
+EOF
+
+# ========================================
+# ARQUIVO 5: Todas as Credenciais
+# ========================================
+cat > CREDENCIAIS-COMPLETAS.txt <<EOF
+================================================
+PLANNERATE - CREDENCIAIS COMPLETAS
+Servidor: $HOSTNAME
+IP: $IP_ADDRESS
+Gerado em: $TIMESTAMP
+================================================
+
+⚠️  MANTENHA ESTE ARQUIVO SEGURO ⚠️
+
+========================================
+POSTGRESQL ADMIN
+========================================
+Host: $IP_ADDRESS
+Port: 5432
+User: postgres
+Password: $POSTGRES_ADMIN_PASS
+
+========================================
+REPLICAÇÃO
+========================================
+User: replicator
+Password: $REPLICATOR_PASS
+Slot: replica1_slot
+
+========================================
+PRODUÇÃO
+========================================
+Database: ${DB_PRODUCTION}
+User: ${USER_PRODUCTION}
+Password: $PROD_USER_PASS
+
+Connection String:
+postgresql://${USER_PRODUCTION}:$PROD_USER_PASS@$IP_ADDRESS:5432/${DB_PRODUCTION}
+
+========================================
+STAGING
+========================================
+Database: ${DB_STAGING}
+User: ${USER_STAGING}
+Password: $STAGING_USER_PASS
+
+Connection String:
+postgresql://${USER_STAGING}:$STAGING_USER_PASS@$IP_ADDRESS:5432/${DB_STAGING}
+
+========================================
+COMANDOS ÚTEIS
+========================================
+
+# Conectar ao database de produção
+psql -h $IP_ADDRESS -U ${USER_PRODUCTION} -d ${DB_PRODUCTION}
+
+# Conectar ao database de staging
+psql -h $IP_ADDRESS -U ${USER_STAGING} -d ${DB_STAGING}
+
+# Ver réplicas conectadas
+sudo -u postgres psql -c "SELECT * FROM pg_stat_replication;"
+
+# Backup produção
+pg_dump -h $IP_ADDRESS -U ${USER_PRODUCTION} ${DB_PRODUCTION} > backup_production.sql
+
+# Backup staging
+pg_dump -h $IP_ADDRESS -U ${USER_STAGING} ${DB_STAGING} > backup_staging.sql
+EOF
+
+# Proteger arquivos
+chmod 600 *.txt *.php
 
 # Exibir resumo
 echo ""
-echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}================================================${NC}"
 echo -e "${GREEN}  INSTALAÇÃO CONCLUÍDA COM SUCESSO!${NC}"
-echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}================================================${NC}"
 echo ""
-echo -e "${YELLOW}Informações do Servidor Primário:${NC}"
-echo "  Hostname: $HOSTNAME"
+echo -e "${BLUE}📁 Arquivos criados em: /root/plannerate-config/${NC}"
+echo ""
+echo -e "${YELLOW}Arquivos gerados:${NC}"
+echo "  ✅ replica-config.txt              (copiar para réplica)"
+echo "  ✅ laravel-env-production.txt      (copiar para .env produção)"
+echo "  ✅ laravel-env-staging.txt         (copiar para .env staging)"
+echo "  ✅ laravel-database-config.php     (config/database.php)"
+echo "  ✅ CREDENCIAIS-COMPLETAS.txt       (MANTER SEGURO!)"
+echo ""
+echo -e "${YELLOW}Informações:${NC}"
+echo "  Servidor: $HOSTNAME"
 echo "  IP: $IP_ADDRESS"
 echo "  Porta: 5432"
-echo "  PostgreSQL: $PG_VERSION"
 echo ""
-echo -e "${YELLOW}Bancos de Dados Criados:${NC}"
-echo "  - laravel (desenvolvimento)"
-echo "  - plannerate_staging"
-echo "  - plannerate_production"
+echo -e "${YELLOW}Databases criados:${NC}"
+echo "  📦 ${DB_PRODUCTION} (produção)"
+echo "  📦 ${DB_STAGING} (staging)"
 echo ""
-echo -e "${YELLOW}Slots de Replicação:${NC}"
-echo "  - plannerate_replica_slot_1"
-echo "  - plannerate_replica_slot_2"
-echo "  - plannerate_replica_slot_3"
+echo -e "${YELLOW}Para configurar a réplica:${NC}"
+echo "  1. Copie o arquivo replica-config.txt para a máquina réplica"
+echo "  2. Execute: ${GREEN}./setup-plannerate-replica.sh${NC}"
 echo ""
-echo -e "${YELLOW}Credenciais salvas em:${NC}"
-echo "  ${GREEN}$CREDENTIALS_FILE${NC}"
+echo -e "${YELLOW}Ver os arquivos gerados:${NC}"
+echo "  ${GREEN}cd /root/plannerate-config${NC}"
+echo "  ${GREEN}ls -la${NC}"
 echo ""
-echo -e "${YELLOW}⚠️  IMPORTANTE - Copie este arquivo para as réplicas:${NC}"
-echo "  ${GREEN}scp $CREDENTIALS_FILE user@replica-ip:~/${NC}"
+echo -e "${YELLOW}Ver credenciais:${NC}"
+echo "  ${GREEN}cat /root/plannerate-config/CREDENCIAIS-COMPLETAS.txt${NC}"
 echo ""
-echo -e "${YELLOW}Próximos Passos:${NC}"
-echo "  1. Copie o arquivo de credenciais para as máquinas réplicas"
-echo "  2. Execute setup-plannerate-replica-v2.sh nas réplicas"
+echo -e "${GREEN}Servidor primário pronto! 🚀${NC}"
 echo ""
-echo -e "${YELLOW}Comandos Úteis:${NC}"
-echo "  Ver réplicas conectadas:"
-echo "    ${GREEN}sudo -u postgres psql -c 'SELECT * FROM pg_stat_replication;'${NC}"
-echo ""
-echo "  Ver bancos:"
-echo "    ${GREEN}sudo -u postgres psql -c '\l'${NC}"
-echo ""
-echo "  Status do serviço:"
-echo "    ${GREEN}systemctl status postgresql${NC}"
-echo ""
-echo -e "${GREEN}Servidor primário pronto para aceitar réplicas!${NC}"
-echo ""
-
