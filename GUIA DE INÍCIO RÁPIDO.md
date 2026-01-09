@@ -18,7 +18,7 @@ Para 3 máquinas Ubuntu NOVAS sem nada instalado.
 ssh root@IP_MAQUINA_1
 
 # 2. Baixar o script
-wget -O setup-primary.sh https://raw.githubusercontent.com/SEU_REPO/setup-primary.sh
+wget -O setup-primary.sh https://raw.githubusercontent.com/callcocam/postgres-replicas/main/setup-primary.sh
 # OU copiar manualmente o conteúdo do script
 
 # 3. Dar permissão
@@ -39,7 +39,7 @@ chmod +x setup-primary.sh
 ssh root@IP_MAQUINA_2
 
 # 2. Baixar o script
-wget -O setup-replica.sh https://raw.githubusercontent.com/SEU_REPO/setup-replica.sh
+wget -O setup-replica.sh https://raw.githubusercontent.com/callcocam/postgres-replicas/main/setup-replica.sh
 # OU copiar manualmente o conteúdo do script
 
 # 3. Dar permissão
@@ -67,7 +67,7 @@ nano setup-replica.sh
 ssh root@IP_MAQUINA_3
 
 # 2. Baixar o script
-wget -O setup-replica.sh https://raw.githubusercontent.com/SEU_REPO/setup-replica.sh
+wget -O setup-replica.sh https://raw.githubusercontent.com/callcocam/postgres-replicas/main/setup-replica.sh
 # OU copiar manualmente o conteúdo do script
 
 # 3. Dar permissão
