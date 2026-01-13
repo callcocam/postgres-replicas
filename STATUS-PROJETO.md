@@ -1,6 +1,6 @@
 # STATUS DO PROJETO - Infraestrutura Plannerate
 
-**Última Atualização:** 13 de Janeiro de 2026 (12:05 UTC)
+**Última Atualização:** 13 de Janeiro de 2026 (12:35 UTC)
 
 ---
 
@@ -147,6 +147,7 @@
 - ✅ Deploy automático para staging
 - ✅ Deploy automático para production
 - ✅ Versionamento de imagens (tags: main, dev, SHA)
+- ✅ **Deploy Fix**: Auto-clear e cache de configs (resolve erro 500 de APP_KEY)
 
 ### 4. PgBouncer (Connection Pooling) - 100% ✨
 
@@ -289,7 +290,7 @@ bash /root/restore-from-s3.sh plannerate_production 20260113_012050
 
 ### 1. Testes de Validação - PRIORIDADE MÉDIA
 
-**Status**: 0% - Não iniciado
+**Status**: 90% - Em andamento
 
 **Testes necessários**:
 - [ ] **Stress Test**: Simular carga alta na aplicação
@@ -300,23 +301,7 @@ bash /root/restore-from-s3.sh plannerate_production 20260113_012050
 - [ ] **Teste de Backup/Restore**: Validar recuperação de dados
 - [ ] **Teste de Segurança**: Verificar exposição de portas
 
-### 2. Monitoramento - PRIORIDADE MÉDIA
-
-**Status**: 0% - Não iniciado
-
-**Ferramentas a implementar**:
-- [ ] **Prometheus + Grafana**: Métricas de infraestrutura
-- [ ] **PostgreSQL Exporter**: Métricas do banco
-- [ ] **Redis Exporter**: Métricas do cache
-- [ ] **Alertas**: Notificações de problemas
-  - Replication lag > 10MB
-  - Disk usage > 80%
-  - Memory usage > 90%
-  - Containers unhealthy
-- [ ] **Logs centralizados**: Agregação com Loki ou similar
-- [ ] **Dashboard público**: Visualização de uptime
-
-### 3. Otimizações Futuras - PRIORIDADE BAIXA
+### 2. Otimizações Futuras - PRIORIDADE BAIXA
 
 - [ ] CDN para assets estáticos
 - [ ] Read replicas para queries pesadas
@@ -358,10 +343,12 @@ bash /root/restore-from-s3.sh plannerate_production 20260113_012050
 3. ✅ ~~Criar script de backup S3~~ **CONCLUÍDO** ✨
 4. ✅ ~~Configurar cron de backups~~ **CONCLUÍDO**
 5. ✅ ~~Instalar Prometheus + Grafana~~ **CONCLUÍDO** 🆕✨
+6. ✅ ~~Importar dashboards Grafana~~ **CONCLUÍDO** 🆕✨
+7. ✅ ~~Corrigir deploy workflow (config:cache)~~ **CONCLUÍDO** 🆕✨
 
 ### Curto Prazo (Próximas 2 Semanas)
-1. Implementar monitoramento básico
-2. Executar testes de validação
+1. Configurar notificações de alertas (Slack, email, webhook)
+2. Executar testes de validação (stress test, failover)
 3. Documentar procedimentos de emergência
 4. Criar runbook de operação
 
