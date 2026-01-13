@@ -25,8 +25,10 @@ Sistema completo de monitoramento para a infraestrutura Plannerate usando Promet
 | Componente | Métricas | Exporter | Porta |
 |-----------|----------|----------|-------|
 | **Sistema (VM Docker)** | CPU, RAM, Disco, Rede | Node Exporter | 9100 |
-| **Sistema (VM PostgreSQL)** | CPU, RAM, Disco, Rede | Node Exporter | 9100 |
+| **Sistema (VM PostgreSQL Master)** | CPU, RAM, Disco, Rede | Node Exporter | 9100 |
+| **Sistema (VM PostgreSQL Replica)** | CPU, RAM, Disco, Rede | Node Exporter | 9100 |
 | **PostgreSQL Master** | Conexões, queries, locks, replicação | PostgreSQL Exporter | 9187 |
+| **PostgreSQL Replica** | Conexões, queries, replication lag | PostgreSQL Exporter | 9187 |
 | **PgBouncer** | Pools, clientes, queries | PgBouncer Exporter | 9127 |
 | **Redis** | Memória, comandos, keyspace | Redis Exporter | 9121 |
 | **Containers Docker** | CPU, memória, I/O | cAdvisor | 8080 |
@@ -65,20 +67,32 @@ Sistema completo de monitoramento para a infraestrutura Plannerate usando Promet
 └─────────────────────────────────────────────────────────────────┘
                               │
                               │ scrape (pull)
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                VM POSTGRESQL (72.62.139.43)                     │
-│                                                                 │
-│  ┌─────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
-│  │Node Exporter│  │PostgreSQL Exporter│  │PgBouncer Exporter│  │
-│  │   :9100     │  │      :9187        │  │      :9127       │  │
-│  └─────────────┘  └──────────────────┘  └──────────────────┘  │
-│                                                                 │
-│  ┌────────────┐   ┌──────────┐                                 │
-│  │ PostgreSQL │   │ PgBouncer│                                 │
-│  │   :5432    │   │  :6432   │                                 │
-│  └────────────┘   └──────────┘                                 │
-└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+              ▼                               ▼
+┌──────────────────────────────┐  ┌──────────────────────────────┐
+│ VM POSTGRESQL MASTER         │  │ VM POSTGRESQL REPLICA        │
+│      (72.62.139.43)          │  │      (72.60.240.151)         │
+│                              │  │                              │
+│ ┌─────────┐  ┌────────────┐ │  │ ┌─────────┐  ┌────────────┐ │
+│ │  Node   │  │ PostgreSQL │ │  │ │  Node   │  │ PostgreSQL │ │
+│ │Exporter │  │  Exporter  │ │  │ │Exporter │  │  Exporter  │ │
+│ │  :9100  │  │   :9187    │ │  │ │  :9100  │  │   :9187    │ │
+│ └─────────┘  └────────────┘ │  │ └─────────┘  └────────────┘ │
+│                              │  │                              │
+│ ┌──────────┐                 │  │ ┌────────────┐              │
+│ │PgBouncer │                 │  │ │ PostgreSQL │              │
+│ │ Exporter │                 │  │ │  (Replica) │              │
+│ │  :9127   │                 │  │ │   :5432    │              │
+│ └──────────┘                 │  │ └────────────┘              │
+│                              │  │        ▲                     │
+│ ┌────────┐  ┌──────────┐    │  │        │                     │
+│ │PostreSQL│ │ PgBouncer│    │  │        │ replication         │
+│ │ (Master)│ │  :6432   │    │──┼────────┘                     │
+│ │  :5432  │ └──────────┘    │  │                              │
+│ └────────┘                   │  │                              │
+└──────────────────────────────┘  └──────────────────────────────┘
 ```
 
 ---
@@ -397,8 +411,8 @@ amtool silence add alertname="PostgreSQLDown" -d 1h -c "Manutenção programada"
 
 | Serviço | URL | Credenciais |
 |---------|-----|-------------|
-| **Grafana** | https://grafana.plannerate.com.br | admin / plannerate2026 |
-| **Prometheus** | https://prometheus.plannerate.com.br | admin / admin |
+| **Grafana** | https://grafana.plannerate.dev.br | admin / plannerate2026 |
+| **Prometheus** | https://prometheus.plannerate.dev.br | admin / admin |
 | **Alertmanager** | http://148.230.78.184:9093 | - |
 
 ### Autenticação Prometheus

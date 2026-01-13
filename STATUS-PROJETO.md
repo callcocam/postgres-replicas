@@ -1,12 +1,12 @@
 # STATUS DO PROJETO - Infraestrutura Plannerate
 
-**Última Atualização:** 13 de Janeiro de 2026 (01:30 UTC)
+**Última Atualização:** 13 de Janeiro de 2026 (12:05 UTC)
 
 ---
 
 ## 📊 RESUMO EXECUTIVO
 
-### Progresso Geral: 90% Completo ⬆️⬆️
+### Progresso Geral: 95% Completo ⬆️⬆️⬆️
 
 | Componente | Status | Progresso | Prioridade |
 |-----------|--------|-----------|------------|
@@ -17,6 +17,7 @@
 | Documentação Base | ✅ Completo | 100% | MÉDIO |
 | **PgBouncer (Connection Pool)** | ✅ **Completo** | **100%** | **ALTO** |
 | **Backup S3 Automatizado** | ✅ **Completo** | **100%** ⬆️ | **ALTO** |
+| **Monitoramento (Prometheus + Grafana)** | ✅ **Completo** | **100%** 🆕 | **ALTO** |
 | Testes de Validação | ❌ Não iniciado | 0% | MÉDIO |
 | Monitoramento | ❌ Não iniciado | 0% | MÉDIO |
 
@@ -231,7 +232,45 @@ bash /root/restore-from-s3.sh plannerate_production 20260113_012050
 - ✅ Troubleshooting
 - ✅ Configuração de staging (desabilitado por padrão)
 
-### 6. Segurança
+### 6. Monitoramento Completo - 100% 🆕✨
+
+**Status**: ✅ Instalado, configurado e operacional
+
+#### Prometheus (Coleta de Métricas)
+- ✅ **Containers**:
+  - Prometheus: Armazenamento de time-series com retenção de 15 dias
+  - Grafana: Dashboard interativo com visualizações
+  - Alertmanager: Gerenciamento centralizado de alertas
+  - cAdvisor: Métricas de containers Docker
+- ✅ **Scraping**: 
+  - Node Exporter x3 (Docker VM + Master + Replica)
+  - PostgreSQL Exporter x2 (Master + Replica)
+  - PgBouncer Exporter x1 (Master)
+  - Redis Exporter x1 (Container)
+  - cAdvisor x1 (Container metrics)
+- ✅ **Alertas**: 20+ regras configuradas
+  - Críticos: PostgreSQL down, PgBouncer down, Redis down, disco cheio
+  - Warnings: CPU alta, memória alta, lag de replicação, muitas conexões
+
+#### Acesso
+- **Grafana**: https://grafana.plannerate.dev.br (admin / plannerate2026)
+- **Prometheus**: https://prometheus.plannerate.dev.br (admin / admin)
+- **Alertmanager**: http://148.230.78.184:9093
+
+#### Dashboards Recomendados
+- Node Exporter Full (ID: 1860) - CPU, RAM, disco, rede
+- PostgreSQL Database (ID: 9628) - Conexões, queries, locks
+- PgBouncer Stats (ID: 16396) - Pools, throughput, latência
+- Redis Dashboard (ID: 763) - Memória, comandos, keyspace
+- Docker Containers (ID: 193) - Container metrics
+
+#### Documentação
+- ✅ `MONITORAMENTO.md` - Guia completo de 400+ linhas
+- ✅ Scripts de exporters automáticos
+- ✅ Configurações prontas (prometheus.yml, alerts.yml, alertmanager.yml)
+- ✅ Dashboards provisioning automático
+
+### 7. Segurança
 - ✅ SSL/TLS em todos os endpoints
 - ✅ Firewall configurado em ambas as VMs
 - ✅ Senhas geradas aleatoriamente
@@ -241,6 +280,8 @@ bash /root/restore-from-s3.sh plannerate_production 20260113_012050
 - ✅ userlist.txt protegido (permissão 600)
 - ✅ Credenciais de backup protegidas (permissão 600)
 - ✅ Backups criptografados em trânsito (HTTPS)
+- ✅ Prometheus com autenticação básica HTTP
+- ✅ Grafana com senha configurada
 
 ---
 
@@ -316,6 +357,7 @@ bash /root/restore-from-s3.sh plannerate_production 20260113_012050
 2. ✅ ~~Implementar PgBouncer~~ **CONCLUÍDO** ✨
 3. ✅ ~~Criar script de backup S3~~ **CONCLUÍDO** ✨
 4. ✅ ~~Configurar cron de backups~~ **CONCLUÍDO**
+5. ✅ ~~Instalar Prometheus + Grafana~~ **CONCLUÍDO** 🆕✨
 
 ### Curto Prazo (Próximas 2 Semanas)
 1. Implementar monitoramento básico
