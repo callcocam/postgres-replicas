@@ -33,8 +33,8 @@ Crie o arquivo `/root/.backup-env`:
 
 ```bash
 # DigitalOcean Spaces
-export DO_ACCESS_KEY_ID="DO007CETKLCXD6WYKFZG"
-export DO_SECRET_ACCESS_KEY="BBB2eyUrD0UUvh78bnzM00SOuzQGNX/olpRBRyQkwoA"
+export DO_ACCESS_KEY_ID=""
+export DO_SECRET_ACCESS_KEY=""
 export DO_ENDPOINT="https://sfo3.digitaloceanspaces.com"
 export DO_BUCKET="planify"
 export DO_REGION="sfo3"
