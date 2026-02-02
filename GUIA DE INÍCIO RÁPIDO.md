@@ -390,53 +390,16 @@ Todas as senhas são geradas automaticamente e podem ser encontradas em:
 
 ---
 
-## 📦 Configurar Backups Automáticos
+## 📦 Configurar Backups (somente na RÉPLICA)
 
-### Passo 1: Configurar Credenciais S3
+**Backups não rodam no primário.** Configure tudo na réplica.
 
-```bash
-# Copiar exemplo
-cp /root/postgres-replicas/backup/.backup-env.example /root/.backup-env
+1. Copie a pasta **`backup/`** para a réplica (ex.: `/root/`).
+2. Configure `.backup-env` na réplica (credenciais S3 + senha Postgres).
+3. Instale `awscli` na réplica.
+4. Teste os scripts e configure o cron **na réplica**.
 
-# Editar com suas credenciais
-nano /root/.backup-env
-
-# Proteger arquivo
-chmod 600 /root/.backup-env
-```
-
-### Passo 2: Copiar Scripts de Backup
-
-```bash
-cp /root/postgres-replicas/backup/*.sh /root/
-chmod +x /root/*.sh
-```
-
-### Passo 3: Testar Backups
-
-```bash
-# Testar backup horário (tabelas críticas)
-/root/postgres-backup-tables-hours.sh
-
-# Testar backup diário (todas tabelas)
-/root/postgres-backup-tables-full.sh
-```
-
-### Passo 4: Configurar Cron
-
-```bash
-crontab -e
-
-# Adicionar:
-# Backup horário - a cada hora
-0 * * * * source /root/.backup-env && /root/postgres-backup-tables-hours.sh >> /var/log/postgresql-backup-hourly.log 2>&1
-
-# Backup diário - às 3h
-0 3 * * * source /root/.backup-env && /root/postgres-backup-tables-full.sh >> /var/log/postgresql-backup-daily.log 2>&1
-
-# Backup completo (.sql.gz) - às 4h
-0 4 * * * source /root/.backup-env && /root/backup-to-s3.sh >> /var/log/postgresql-backup.log 2>&1
-```
+📚 **Guia completo:** [backup/BACKUP-NA-REPLICA.md](backup/BACKUP-NA-REPLICA.md)
 
 ### Estratégia de Backup
 
@@ -466,10 +429,10 @@ crontab -e
 
 ## 🎯 Checklist de Implantação
 
-- [ ] Servidor Primário configurado
+- [ ] Servidor Primário configurado (sem cron de backup)
 - [ ] Servidor Réplica configurado e sincronizando
-- [ ] Laravel configurado com read/write split
-- [ ] Backups automáticos configurados
+- [ ] Backups configurados **na réplica** (cron só na réplica)
+- [ ] Laravel configurado com read/write split (opcional)
 - [ ] Restore testado e funcionando
 - [ ] Monitoramento configurado (opcional)
 - [ ] Alertas configurados (opcional)

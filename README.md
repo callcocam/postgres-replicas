@@ -10,19 +10,23 @@ Pacote completo para configurar PostgreSQL com:
 
 ```
 postgres-replicas/
-├── setup-primary.sh              # Setup do servidor primário
-├── setup-replica.sh              # Setup do servidor réplica
+├── ONDE-USAR.md                  # Primário vs Réplica (leia primeiro)
+├── setup-primary.sh              # PRIMÁRIO: setup do servidor primário
+├── setup-replica.sh              # RÉPLICA: setup de replicação (uma vez)
 ├── GUIA DE INÍCIO RÁPIDO.md      # Guia completo de instalação
-├── backup/                       # Scripts de backup
-│   ├── README.md                 # Documentação de backup
+├── backup/                       # RÉPLICA: copiar esta pasta para a réplica
+│   ├── BACKUP-NA-REPLICA.md      # Guia: configurar backups na réplica
+│   ├── README.md                 # Documentação dos scripts
 │   ├── .backup-env.example       # Exemplo de configuração
+│   ├── backup-to-s3.sh           # Backup completo .sql.gz
 │   ├── postgres-backup-tables-hours.sh   # Backup horário
 │   ├── postgres-backup-tables-full.sh    # Backup diário
-│   ├── backup-to-s3.sh           # Backup completo (.sql.gz)
-│   ├── restore-tables-from-s3.sh # Restore por tabelas
-│   └── restore-from-s3.sh        # Restore completo
+│   ├── restore-from-s3.sh        # Restore completo
+│   └── restore-tables-from-s3.sh # Restore por tabelas
 └── .credentials.example          # Exemplo de credenciais
 ```
+
+**Separação:** Primário = só instalação. Réplica = instalação + **backups** (cron só na réplica).
 
 ## ⚡ Quick Start
 
@@ -48,21 +52,13 @@ chmod +x setup-replica.sh
 ./setup-replica.sh
 ```
 
-### 3. Configurar Backups
+### 3. Configurar Backups (somente na RÉPLICA)
+
+Backups **não** rodam no primário. Use a pasta `backup/` **na réplica**:
 
 ```bash
-# Copiar scripts
-cp backup/*.sh /root/
-chmod +x /root/*.sh
-
-# Configurar credenciais S3
-cp backup/.backup-env.example /root/.backup-env
-nano /root/.backup-env
-chmod 600 /root/.backup-env
-
-# Configurar cron
-crontab -e
-# Adicionar as linhas do backup (ver GUIA DE INÍCIO RÁPIDO.md)
+# Na réplica: copiar pasta backup/ para /root/, configurar .backup-env e cron
+# Ver: backup/BACKUP-NA-REPLICA.md
 ```
 
 ## 🏗️ Arquitetura
@@ -131,8 +127,10 @@ sudo -u postgres psql -c "SELECT NOW() - pg_last_xact_replay_timestamp() AS lag;
 
 ## 📚 Documentação
 
+- **[ONDE-USAR.md](ONDE-USAR.md)** - O que usar no primário vs na réplica
 - **[GUIA DE INÍCIO RÁPIDO.md](GUIA%20DE%20INÍCIO%20RÁPIDO.md)** - Instalação passo a passo
-- **[backup/README.md](backup/README.md)** - Documentação completa de backup
+- **[backup/BACKUP-NA-REPLICA.md](backup/BACKUP-NA-REPLICA.md)** - Configurar backups na réplica
+- **[backup/README.md](backup/README.md)** - Detalhes dos scripts de backup
 
 ## 🔐 Segurança
 
@@ -143,10 +141,10 @@ sudo -u postgres psql -c "SELECT NOW() - pg_last_xact_replay_timestamp() AS lag;
 
 ## 📋 Checklist de Implantação
 
-- [ ] Servidor Primário configurado
+- [ ] Servidor Primário configurado (sem cron de backup)
 - [ ] Servidor Réplica sincronizando
-- [ ] Laravel com read/write split
-- [ ] Backups automáticos no cron
+- [ ] Backups configurados **na réplica** (cron só na réplica)
+- [ ] Laravel com read/write split (opcional)
 - [ ] Restore testado
 - [ ] Credenciais armazenadas com segurança
 
