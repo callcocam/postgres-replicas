@@ -51,3 +51,10 @@ Copie **toda a pasta `backup/`** para a réplica (ex.: `/root/`):
 
 1. **Primário:** instalação com `setup-primary.sh` e `setup-replica.sh` (na réplica), sem cron de backup.
 2. **Réplica:** copiar `backup/` para `/root/`, configurar `.backup-env`, instalar `awscli`, testar scripts e configurar cron conforme `BACKUP-NA-REPLICA.md`.
+
+### Backup/Restore (sem nomes fixos)
+
+- Bancos são descobertos dinamicamente (todos exceto templates e `postgres`).
+- **Principal** = banco que tem tabelas `tenants` e `clients`; **cliente** = caso contrário.
+- Nome do arquivo de backup = nome do banco (ex.: `meu_banco_daily_20260202_030000.tar.gz`). Restore restaura no banco com esse nome.
+- Restore de todos: `./restore-tables-from-s3.sh --all-databases --type daily`.

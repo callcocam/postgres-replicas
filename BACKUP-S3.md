@@ -10,22 +10,25 @@ Sistema completo de backup automatizado para PostgreSQL com upload para DigitalO
 - ✅ Restore simplificado
 - ✅ Compressão gzip
 
+**Local dos scripts:** Todos os scripts de backup e restore ficam na pasta `backup/` deste pacote.  
+**Onde rodar:** Backups devem rodar na **réplica** (não no primário). Ver `backup/BACKUP-NA-REPLICA.md`.
+
 ## 🔧 Configuração
 
-### 1. Instalar no Servidor PostgreSQL (72.62.139.43)
+### 1. Instalar na Réplica (não no primário)
 
 ```bash
-# Fazer upload dos scripts
-scp postgres-replicas/backup-to-s3.sh root@72.62.139.43:/root/
-scp postgres-replicas/restore-from-s3.sh root@72.62.139.43:/root/
+# Copiar a pasta backup/ para a réplica (troque IP_REPLICA pelo IP da réplica)
+IP_REPLICA=72.60.240.151
+scp backup/*.sh root@$IP_REPLICA:/root/
+scp backup/.backup-env.example root@$IP_REPLICA:/root/
 
-# SSH no servidor
-ssh root@72.62.139.43
-
-# Tornar executáveis
-chmod +x /root/backup-to-s3.sh
-chmod +x /root/restore-from-s3.sh
+# Na réplica: renomear e configurar
+ssh root@$IP_REPLICA "mv /root/.backup-env.example /root/.backup-env && chmod 600 /root/.backup-env"
+ssh root@$IP_REPLICA "chmod +x /root/*.sh"
 ```
+
+Detalhes completos: **backup/BACKUP-NA-REPLICA.md** e **backup/README.md**.
 
 ### 2. Configurar Variáveis de Ambiente
 
@@ -241,7 +244,7 @@ s3://planify/backups/postgresql/
 # Proteger arquivo de credenciais
 chmod 600 /root/.backup-env
 
-# Proteger scripts
+# Proteger scripts (na réplica, após copiar backup/*.sh para /root/)
 chmod 700 /root/backup-to-s3.sh
 chmod 700 /root/restore-from-s3.sh
 ```
@@ -284,7 +287,7 @@ journalctl -u cron -f
 
 ### Alertas
 
-Para ser notificado de falhas, adicione ao final do `/root/backup-to-s3.sh`:
+Para ser notificado de falhas, adicione ao final do script de backup (em `/root/backup-to-s3.sh` na réplica):
 
 ```bash
 # Enviar email em caso de falha
@@ -330,7 +333,7 @@ psql -h 127.0.0.1 -U postgres -l
 
 ```bash
 # Usar formato custom (mais rápido)
-# Editar backup-to-s3.sh, linha do pg_dump:
+# Editar o script backup-to-s3.sh (em backup/), linha do pg_dump:
 pg_dump -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" \
     -d "$DB" --verbose --format=custom | gzip > "$BACKUP_FILE"
 ```

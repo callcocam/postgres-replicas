@@ -132,25 +132,38 @@ fi
 echo ""
 
 # ============================================
-# LISTAR BANCOS DE CLIENTES
+# FUNÇÃO: Verificar se banco é principal (tem tabelas tenants e clients)
 # ============================================
+# Cliente = banco que NÃO tem as duas tabelas; só clientes entram no backup horário
+is_principal_database() {
+    local DB=$1
+    local HAS_BOTH
+    HAS_BOTH=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$DB" -t -c \
+        "SELECT (EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='tenants')) AND (EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clients'));" 2>/dev/null | tr -d ' ')
+    [ "$HAS_BOTH" = "t" ]
+}
 
-echo -e "${YELLOW}🔍 Listando bancos de clientes (plannerate_*)...${NC}"
+# ============================================
+# LISTAR BANCOS DE CLIENTES (dinâmico)
+# ============================================
+# Cliente = banco que NÃO tem tenants e clients; nome do backup = nome do banco
 
-# Listar bancos plannerate_* exceto production e staging
-CLIENT_DATABASES=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -t -c \
-    "SELECT datname FROM pg_database WHERE datname LIKE 'plannerate_%' AND datname NOT IN ('plannerate_production', 'plannerate_staging') ORDER BY datname;")
+echo -e "${YELLOW}🔍 Listando bancos (backup horário = só clientes, sem tenants+clients)...${NC}"
 
-# Converter para array
+ALL_DATABASES=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -t -c \
+    "SELECT datname FROM pg_database WHERE datname NOT IN ('template0', 'template1', 'postgres') ORDER BY datname;")
+
 CLIENT_DB_ARRAY=()
 while IFS= read -r line; do
     DB=$(echo "$line" | tr -d ' ')
-    if [ -n "$DB" ]; then
+    [ -z "$DB" ] && continue
+    # Só incluir se for banco cliente (não principal)
+    if ! is_principal_database "$DB"; then
         CLIENT_DB_ARRAY+=("$DB")
     fi
-done <<< "$CLIENT_DATABASES"
+done <<< "$ALL_DATABASES"
 
-echo -e "${GREEN}✅ Encontrados ${#CLIENT_DB_ARRAY[@]} bancos de clientes${NC}"
+echo -e "${GREEN}✅ Encontrados ${#CLIENT_DB_ARRAY[@]} bancos de clientes (6 tabelas críticas)${NC}"
 echo ""
 
 # ============================================
@@ -218,7 +231,7 @@ for DB in "${CLIENT_DB_ARRAY[@]}"; do
     if aws s3 cp "$TAR_FILE" "$S3_PATH" \
         --endpoint-url="$DO_ENDPOINT" \
         --storage-class STANDARD \
-        --metadata "database=$DB,type=hourly,timestamp=$TIMESTAMP" \
+        --metadata "database=$DB,type=hourly,timestamp=$TIMESTAMP,database_type=cliente" \
         2>/dev/null; then
         
         echo -e "${GREEN}OK${NC}"

@@ -92,10 +92,12 @@ Adicionar:
 | Script | O que faz | Cron |
 |--------|-----------|------|
 | `backup-to-s3.sh` | Backup completo .sql.gz | 4h |
-| `postgres-backup-tables-hours.sh` | 6 tabelas críticas | A cada hora |
-| `postgres-backup-tables-full.sh` | Todas as tabelas | 3h |
+| `postgres-backup-tables-hours.sh` | 6 tabelas críticas (só bancos cliente) | A cada hora |
+| `postgres-backup-tables-full.sh` | Todas as tabelas (todos os bancos) | 3h |
 | `restore-from-s3.sh` | Restore .sql.gz | Manual |
-| `restore-tables-from-s3.sh` | Restore por tabelas | Manual |
+| `restore-tables-from-s3.sh` | Restore por tabelas (1 banco ou --all-databases) | Manual |
+
+**Principal vs cliente (dinâmico):** Principal = banco com tabelas `tenants` e `clients`; caso contrário = cliente. Nenhum nome de banco é fixo. Nome do backup = nome do banco (restaurar no mesmo lugar).
 
 ---
 

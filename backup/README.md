@@ -42,11 +42,22 @@ Sistema completo de backup automático para PostgreSQL com upload para DigitalOc
 
 | Script | Função | Frequência |
 |--------|--------|------------|
-| `postgres-backup-tables-hours.sh` | Backup das 6 tabelas críticas dos clientes | A cada hora |
+| `postgres-backup-tables-hours.sh` | Backup das 6 tabelas críticas (só bancos cliente) | A cada hora |
 | `postgres-backup-tables-full.sh` | Backup completo por tabelas (todos os bancos) | Diário (3h) |
 | `backup-to-s3.sh` | Backup completo do banco (.sql.gz) | Diário (4h) |
-| `restore-tables-from-s3.sh` | Restauração por tabelas (hourly/daily) | Manual |
+| `restore-tables-from-s3.sh` | Restauração por tabelas (1 banco ou --all-databases) | Manual |
 | `restore-from-s3.sh` | Restauração de banco completo (.sql.gz) | Manual |
+
+## 🔍 Principal vs Cliente (dinâmico)
+
+**Nenhum nome de banco é fixo.** A classificação é feita pelo conteúdo do banco:
+
+- **Principal** = banco que tem as tabelas `tenants` e `clients` (schema `public`).
+- **Cliente** = banco que não tem as duas.
+
+Os scripts listam todos os bancos (exceto `template0`, `template1`, `postgres`) e aplicam a regra acima. Novos ou removidos bancos entram/saem sozinhos.
+
+**Nome do backup** = nome do banco (ex.: `meu_banco_daily_20260202_030000.tar.gz`). O restore usa o nome do arquivo e restaura no mesmo banco.
 
 ## ⚡ Instalação Rápida
 
@@ -173,18 +184,24 @@ s3://seu-bucket/backups/
 ### Restaurar Backup de Tabelas
 
 ```bash
-# Restaurar último backup diário completo
-./restore-tables-from-s3.sh plannerate_albert --type daily
+# Listar backups (mostra principal/cliente por banco)
+./restore-tables-from-s3.sh --list daily
+./restore-tables-from-s3.sh --list hourly
 
-# Restaurar backup horário (só tabelas críticas)
-./restore-tables-from-s3.sh plannerate_albert --type hourly
+# Restaurar um banco (último backup)
+./restore-tables-from-s3.sh NOME_DO_BANCO --type daily
+
+# Restaurar TODOS os bancos (principal + clientes)
+./restore-tables-from-s3.sh --all-databases --type daily
+
+# Todos os bancos no mesmo timestamp
+./restore-tables-from-s3.sh --all-databases --type daily --timestamp 20260202_030000
 
 # Restaurar apenas tabelas específicas
-./restore-tables-from-s3.sh plannerate_albert --type hourly --tables planograms,gondolas
-
-# Restaurar backup específico por timestamp
-./restore-tables-from-s3.sh plannerate_albert --type daily --timestamp 20260202_030000
+./restore-tables-from-s3.sh NOME_DO_BANCO --type hourly --tables planograms,gondolas
 ```
+
+O nome do banco no backup é o mesmo do arquivo; o restore restaura sempre no banco com esse nome.
 
 ### Restaurar Backup Completo (.sql.gz)
 

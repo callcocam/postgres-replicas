@@ -188,9 +188,12 @@ PGPASSWORD="xxx" psql -h 127.0.0.1 -p 6432 -U postgres pgbouncer -c "SHOW STATS;
 **Status**: ✅ Instalado, configurado e operacional
 
 #### DigitalOcean Spaces (S3-Compatible)
-- ✅ **Scripts de Backup**:
-  - `backup-to-s3.sh` - Backup automático com compressão gzip
-  - `restore-from-s3.sh` - Restore simplificado
+- ✅ **Scripts de Backup** (pasta `backup/`; rodar na **réplica**):
+  - `backup/backup-to-s3.sh` - Backup completo .sql.gz
+  - `backup/restore-from-s3.sh` - Restore completo
+  - `backup/postgres-backup-tables-hours.sh` - Backup horário (6 tabelas)
+  - `backup/postgres-backup-tables-full.sh` - Backup diário (todas as tabelas)
+  - `backup/restore-tables-from-s3.sh` - Restore por tabelas (1 banco ou --all-databases)
 - ✅ **Configuração**:
   - Bucket: `planify` (região sfo3)
   - Compressão: gzip (economia ~70%)
@@ -212,19 +215,21 @@ PGPASSWORD="xxx" psql -h 127.0.0.1 -p 6432 -U postgres pgbouncer -c "SHOW STATS;
 - ✅ Restore com confirmação
 - ✅ Desconexão automática de usuários no restore
 
-#### Comandos Úteis
+#### Comandos Úteis (na réplica, após copiar `backup/*.sh` para `/root/`)
 ```bash
 # Backup manual
 source /root/.backup-env && bash /root/backup-to-s3.sh
 
-# Listar backups
+# Listar backups (completo .sql.gz)
 bash /root/restore-from-s3.sh plannerate_production --list
 
-# Restaurar último backup
+# Restaurar último backup (completo)
 bash /root/restore-from-s3.sh plannerate_production
 
 # Restaurar backup específico
 bash /root/restore-from-s3.sh plannerate_production 20260113_012050
+
+# Listar/restaurar backups por tabelas: ver backup/README.md
 ```
 
 #### Documentação
@@ -329,9 +334,8 @@ bash /root/restore-from-s3.sh plannerate_production 20260113_012050
 2. ✅ `docker-compose.staging.new.yml` - Stack de staging
 3. ✅ `.env.production` e `.env.staging` - Variáveis de ambiente
 4. ✅ Scripts de setup PostgreSQL (primary + replica)
-5. ✅ `/root/.backup-env` - Configuração de backup S3 (servidor PostgreSQL)
-6. ✅ `/root/backup-to-s3.sh` - Script de backup automatizado
-7. ✅ `/root/restore-from-s3.sh` - Script de restore
+5. ✅ `/root/.backup-env` - Configuração de backup S3 (na réplica)
+6. ✅ Scripts em `backup/` (copiar para `/root/` na réplica): backup-to-s3.sh, restore-from-s3.sh, postgres-backup-tables-*.sh, restore-tables-from-s3.sh
 
 ---
 

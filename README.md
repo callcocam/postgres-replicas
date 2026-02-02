@@ -26,7 +26,8 @@ postgres-replicas/
 └── .credentials.example          # Exemplo de credenciais
 ```
 
-**Separação:** Primário = só instalação. Réplica = instalação + **backups** (cron só na réplica).
+**Separação:** Primário = só instalação. Réplica = instalação + **backups** (cron só na réplica).  
+**Scripts de backup:** Todos em `backup/`; copiar para `/root/` na réplica (ver `backup/BACKUP-NA-REPLICA.md`).
 
 ## ⚡ Quick Start
 

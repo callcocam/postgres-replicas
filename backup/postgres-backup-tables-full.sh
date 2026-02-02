@@ -151,6 +151,18 @@ fi
 echo ""
 
 # ============================================
+# FUNÇÃO: Verificar se banco é principal (tem tabelas tenants e clients)
+# ============================================
+# Principal = banco que tem as duas tabelas; caso contrário = cliente
+is_principal_database() {
+    local DB=$1
+    local HAS_BOTH
+    HAS_BOTH=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$DB" -t -c \
+        "SELECT (EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='tenants')) AND (EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clients'));" 2>/dev/null | tr -d ' ')
+    [ "$HAS_BOTH" = "t" ]
+}
+
+# ============================================
 # FUNÇÃO: Verificar se tabela está na lista de exclusão
 # ============================================
 is_excluded() {
@@ -255,7 +267,7 @@ backup_database() {
     if aws s3 cp "$TAR_FILE" "$S3_PATH" \
         --endpoint-url="$DO_ENDPOINT" \
         --storage-class STANDARD \
-        --metadata "database=$DB,type=daily,timestamp=$TIMESTAMP" \
+        --metadata "database=$DB,type=daily,timestamp=$TIMESTAMP,database_type=$([ "$DB_TYPE" = "main" ] && echo principal || echo cliente)" \
         2>/dev/null; then
         
         echo -e "${GREEN}OK${NC}"
@@ -280,65 +292,38 @@ backup_database() {
 }
 
 # ============================================
-# LISTAR TODOS OS BANCOS
+# LISTAR E FAZER BACKUP DE TODOS OS BANCOS (dinâmico)
 # ============================================
+# Lista todos os bancos (exceto templates e postgres)
+# Principal = banco que tem tabelas tenants e clients; caso contrário = cliente
+# Nome do backup = nome do banco (restaurar no mesmo lugar)
 
-echo -e "${YELLOW}🔍 Listando bancos plannerate_*...${NC}"
+echo -e "${YELLOW}🔍 Listando bancos (principal = tem tabelas tenants e clients)...${NC}"
 
-# Bancos principais
-MAIN_DATABASES=('plannerate_production' 'plannerate_staging')
+ALL_DATABASES=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -t -c \
+    "SELECT datname FROM pg_database WHERE datname NOT IN ('template0', 'template1', 'postgres') ORDER BY datname;")
 
-# Bancos de clientes
-CLIENT_DATABASES=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -t -c \
-    "SELECT datname FROM pg_database WHERE datname LIKE 'plannerate_%' AND datname NOT IN ('plannerate_production', 'plannerate_staging') ORDER BY datname;")
-
-# Converter para array
-CLIENT_DB_ARRAY=()
-while IFS= read -r line; do
-    DB=$(echo "$line" | tr -d ' ')
-    if [ -n "$DB" ]; then
-        CLIENT_DB_ARRAY+=("$DB")
-    fi
-done <<< "$CLIENT_DATABASES"
-
-TOTAL_DBS=$((${#MAIN_DATABASES[@]} + ${#CLIENT_DB_ARRAY[@]}))
-echo -e "${GREEN}✅ Encontrados $TOTAL_DBS bancos (${#MAIN_DATABASES[@]} principais + ${#CLIENT_DB_ARRAY[@]} clientes)${NC}"
-echo ""
-
-# ============================================
-# REALIZAR BACKUPS
-# ============================================
-
+MAIN_COUNT=0
+CLIENT_COUNT=0
 START_TIME=$(date +%s)
 
-# Backup dos bancos principais
-echo -e "${BLUE}════════════════════════════════════════════════════${NC}"
-echo -e "${BLUE}  BANCOS PRINCIPAIS${NC}"
-echo -e "${BLUE}════════════════════════════════════════════════════${NC}"
-echo ""
-
-for DB in "${MAIN_DATABASES[@]}"; do
-    # Verificar se o banco existe
-    DB_EXISTS=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d postgres -t -c \
-        "SELECT 1 FROM pg_database WHERE datname = '$DB';" 2>/dev/null | tr -d ' ')
+# Processar cada banco: classificar e fazer backup
+while IFS= read -r DB; do
+    DB=$(echo "$DB" | tr -d ' ')
+    [ -z "$DB" ] && continue
     
-    if [ "$DB_EXISTS" = "1" ]; then
+    if is_principal_database "$DB"; then
+        MAIN_COUNT=$((MAIN_COUNT + 1))
         backup_database "$DB" "main"
     else
-        echo -e "${YELLOW}⚠️  Banco $DB não encontrado, pulando...${NC}"
-        echo ""
+        CLIENT_COUNT=$((CLIENT_COUNT + 1))
+        backup_database "$DB" "client"
     fi
-done
+done <<< "$ALL_DATABASES"
 
-# Backup dos bancos de clientes
-echo -e "${BLUE}════════════════════════════════════════════════════${NC}"
-echo -e "${BLUE}  BANCOS DE CLIENTES${NC}"
-echo -e "${BLUE}════════════════════════════════════════════════════${NC}"
+TOTAL_DBS=$((MAIN_COUNT + CLIENT_COUNT))
+echo -e "${GREEN}✅ Processados $TOTAL_DBS bancos ($MAIN_COUNT principais + $CLIENT_COUNT clientes)${NC}"
 echo ""
-
-for DB in "${CLIENT_DB_ARRAY[@]}"; do
-    backup_database "$DB" "client"
-done
 
 # ============================================
 # LIMPEZA - REMOVER BACKUPS ANTIGOS NO S3

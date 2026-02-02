@@ -80,24 +80,45 @@ show_help() {
     echo "================================================"
     echo ""
     echo -e "${YELLOW}Uso:${NC}"
-    echo "  $0 --list [hourly|daily]              Lista backups disponíveis"
+    echo "  $0 --list [hourly|daily]              Lista backups (mostra principal/cliente)"
     echo "  $0 --list-tables <backup_file>        Lista tabelas de um backup"
     echo "  $0 <database> [opções]                Restaura um banco"
+    echo "  $0 --all-databases [opções]           Restaura todos os bancos (principal + clientes)"
     echo ""
     echo -e "${YELLOW}Opções de restauração:${NC}"
     echo "  --type <hourly|daily>    Tipo de backup (padrão: daily)"
     echo "  --timestamp <YYYYMMDD_HHMMSS>  Timestamp específico (padrão: último)"
     echo "  --tables <t1,t2,t3>      Restaurar apenas tabelas específicas"
-    echo "  --all                    Restaurar todas as tabelas (padrão)"
+    echo "  --all-databases          Restaurar TODOS os bancos (principal + clientes)"
     echo ""
     echo -e "${YELLOW}Exemplos:${NC}"
     echo "  $0 --list daily"
     echo "  $0 --list hourly"
-    echo "  $0 plannerate_albert --type hourly"
-    echo "  $0 plannerate_albert --type daily --timestamp 20260202_190621"
-    echo "  $0 plannerate_albert --type hourly --tables planograms,gondolas"
+    echo "  $0 plannerate_albert --type daily              # Um banco (último backup)"
+    echo "  $0 plannerate_production --type daily --timestamp 20260202_190621"
+    echo "  $0 --all-databases --type daily                # Todos os bancos (último de cada)"
+    echo "  $0 --all-databases --type daily --timestamp 20260202_190621  # Todos no mesmo timestamp"
     echo ""
     exit 0
+}
+
+# ============================================
+# HELPER: Tipo do banco (principal ou cliente)
+# ============================================
+# Consulta o PostgreSQL: principal = tem tabelas tenants e clients; caso contrário = cliente
+# Se o banco não existir (ex.: ainda não restaurado), retorna "n/d"
+get_database_type_label() {
+    local DB=$1
+    local HAS_BOTH
+    HAS_BOTH=$(psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$DB" -t -c \
+        "SELECT (EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='tenants')) AND (EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clients'));" 2>/dev/null | tr -d ' ')
+    if [ "$HAS_BOTH" = "t" ]; then
+        echo "principal"
+    elif [ -n "$HAS_BOTH" ]; then
+        echo "cliente"
+    else
+        echo "n/d"
+    fi
 }
 
 # ============================================
@@ -115,6 +136,8 @@ list_backups() {
     echo -e "${BLUE}  Backups disponíveis (${TYPE})${NC}"
     echo "================================================"
     echo ""
+    echo -e "  ${BLUE}Banco (tipo)        | Timestamp     | Tamanho | Data${NC}"
+    echo "  -----------------------------------------------------------------"
     
     aws s3 ls --endpoint-url="$DO_ENDPOINT" --recursive "s3://$DO_BUCKET/backups/${TYPE}/" 2>/dev/null \
         | sort -r | while read -r line; do
@@ -126,10 +149,11 @@ list_backups() {
         BASENAME=$(basename "$FILE" .tar.gz)
         DB_NAME=$(echo "$BASENAME" | sed "s/_${TYPE}_[0-9]*_[0-9]*//")
         TIMESTAMP=$(echo "$BASENAME" | grep -oP '\d{8}_\d{6}')
+        DB_TYPE_LABEL=$(get_database_type_label "$DB_NAME")
         
         SIZE_MB=$(echo "scale=2; $SIZE / 1024 / 1024" | bc)
         
-        echo -e "  ${GREEN}$DB_NAME${NC} | $TIMESTAMP | ${SIZE_MB}MB | $DATE"
+        printf "  %-22s | %-13s | %5sMB | %s\n" "${DB_NAME} (${DB_TYPE_LABEL})" "$TIMESTAMP" "$SIZE_MB" "$DATE"
     done
     
     echo ""
@@ -171,6 +195,7 @@ restore_backup() {
     local TYPE=$2
     local TIMESTAMP=$3
     local TABLES=$4
+    local SKIP_CONFIRM=${5:-0}
     
     echo "================================================"
     echo -e "${BLUE}  PLANNERATE - Restore de Backup${NC}"
@@ -227,29 +252,31 @@ restore_backup() {
     
     echo ""
     
-    # Confirmação
-    echo -e "${YELLOW}⚠️  ATENÇÃO: Esta operação vai MODIFICAR o banco $DATABASE${NC}"
-    echo ""
-    echo -e "${BLUE}Detalhes:${NC}"
-    echo "  Database: $DATABASE"
-    echo "  Tipo: $TYPE"
-    echo "  Timestamp: $TIMESTAMP"
-    echo "  Arquivo: $BACKUP_FILE"
-    if [ -n "$TABLES" ]; then
-        echo "  Tabelas: $TABLES"
-    else
-        echo "  Tabelas: TODAS"
+    # Confirmação (pular se SKIP_CONFIRM=1, ex.: restore --all-databases)
+    if [ "$SKIP_CONFIRM" != "1" ]; then
+        echo -e "${YELLOW}⚠️  ATENÇÃO: Esta operação vai MODIFICAR o banco $DATABASE${NC}"
+        echo ""
+        echo -e "${BLUE}Detalhes:${NC}"
+        echo "  Database: $DATABASE ($(get_database_type_label "$DATABASE"))"
+        echo "  Tipo: $TYPE"
+        echo "  Timestamp: $TIMESTAMP"
+        echo "  Arquivo: $BACKUP_FILE"
+        if [ -n "$TABLES" ]; then
+            echo "  Tabelas: $TABLES"
+        else
+            echo "  Tabelas: TODAS"
+        fi
+        echo ""
+        
+        read -p "Deseja continuar? (digite 'SIM' para confirmar): " CONFIRM
+        
+        if [ "$CONFIRM" != "SIM" ]; then
+            echo -e "${YELLOW}❌ Operação cancelada${NC}"
+            exit 0
+        fi
+        
+        echo ""
     fi
-    echo ""
-    
-    read -p "Deseja continuar? (digite 'SIM' para confirmar): " CONFIRM
-    
-    if [ "$CONFIRM" != "SIM" ]; then
-        echo -e "${YELLOW}❌ Operação cancelada${NC}"
-        exit 0
-    fi
-    
-    echo ""
     
     # Download do backup
     echo -e "${YELLOW}📥 Baixando backup do S3...${NC}"
@@ -369,6 +396,128 @@ WHERE schemaname = 'public';
 " 2>/dev/null
     
     echo ""
+    return $FAILED_COUNT
+}
+
+# ============================================
+# RESTAURAR TODOS OS BANCOS
+# ============================================
+# Lista backups no S3, identifica o banco de cada arquivo (principal ou cliente),
+# e restaura cada um no banco correspondente.
+restore_all_databases() {
+    local TYPE=$1
+    local TIMESTAMP=$2
+    
+    if [ -z "$TYPE" ]; then
+        TYPE="daily"
+    fi
+    
+    echo "================================================"
+    echo -e "${BLUE}  PLANNERATE - Restore de TODOS os Bancos${NC}"
+    echo "================================================"
+    echo ""
+    
+    if [ -z "$DO_ACCESS_KEY_ID" ] || [ -z "$DO_SECRET_ACCESS_KEY" ]; then
+        echo -e "${RED}❌ ERRO: Credenciais DO Spaces não configuradas${NC}"
+        exit 1
+    fi
+    
+    if [ -z "$PGPASSWORD" ]; then
+        echo -e "${RED}❌ ERRO: Senha do PostgreSQL não configurada${NC}"
+        exit 1
+    fi
+    
+    echo -e "${YELLOW}🔍 Buscando backups no S3 (tipo: $TYPE)...${NC}"
+    echo ""
+    
+    # Listar todos os arquivos de backup (ordenar -r para mais recente primeiro)
+    local ALL_FILES
+    ALL_FILES=$(aws s3 ls --endpoint-url="$DO_ENDPOINT" --recursive "s3://$DO_BUCKET/backups/${TYPE}/" 2>/dev/null | sort -r | awk '{print $4}')
+    
+    if [ -z "$ALL_FILES" ]; then
+        echo -e "${RED}❌ Nenhum backup encontrado para tipo '$TYPE'${NC}"
+        exit 1
+    fi
+    
+    # Se timestamp informado: pegar apenas arquivos com esse timestamp
+    # Senão: para cada banco, pegar o backup mais recente (último arquivo por banco)
+    declare -A DB_TO_FILE
+    declare -A DB_TO_TS
+    
+    while IFS= read -r FILE; do
+        [ -z "$FILE" ] && continue
+        BASENAME=$(basename "$FILE" .tar.gz)
+        # Extrair nome do banco: tudo antes de _daily_ ou _hourly_
+        DB_NAME=$(echo "$BASENAME" | sed -E "s/_${TYPE}_[0-9]{8}_[0-9]{6}$//")
+        FILE_TS=$(echo "$BASENAME" | grep -oP '\d{8}_\d{6}')
+        
+        if [ -n "$TIMESTAMP" ]; then
+            # Só incluir se o timestamp do arquivo for o solicitado
+            if [ "$FILE_TS" = "$TIMESTAMP" ]; then
+                DB_TO_FILE["$DB_NAME"]="$FILE"
+                DB_TO_TS["$DB_NAME"]="$FILE_TS"
+            fi
+        else
+            # Manter o mais recente por banco (arquivos já vêm sort -r, primeiro = mais recente)
+            if [ -z "${DB_TO_FILE[$DB_NAME]}" ]; then
+                DB_TO_FILE["$DB_NAME"]="$FILE"
+                DB_TO_TS["$DB_NAME"]="$FILE_TS"
+            fi
+        fi
+    done <<< "$ALL_FILES"
+    
+    if [ ${#DB_TO_FILE[@]} -eq 0 ]; then
+        if [ -n "$TIMESTAMP" ]; then
+            echo -e "${RED}❌ Nenhum backup encontrado com timestamp $TIMESTAMP${NC}"
+        else
+            echo -e "${RED}❌ Nenhum backup encontrado${NC}"
+        fi
+        exit 1
+    fi
+    
+    echo -e "${BLUE}Bancos que serão restaurados:${NC}"
+    echo ""
+    for DB in $(echo "${!DB_TO_FILE[@]}" | tr ' ' '\n' | sort); do
+        LABEL=$(get_database_type_label "$DB")
+        TS=${DB_TO_TS[$DB]}
+        echo -e "  • ${GREEN}$DB${NC} ($LABEL) — backup: $TS"
+    done
+    echo ""
+    
+    if [ -n "$TIMESTAMP" ]; then
+        echo -e "${BLUE}Timestamp: $TIMESTAMP${NC}"
+    else
+        echo -e "${BLUE}Cada banco será restaurado do seu backup mais recente.${NC}"
+    fi
+    echo ""
+    
+    read -p "Restaurar todos esses ${#DB_TO_FILE[@]} bancos? (digite 'SIM' para confirmar): " CONFIRM
+    
+    if [ "$CONFIRM" != "SIM" ]; then
+        echo -e "${YELLOW}❌ Operação cancelada${NC}"
+        exit 0
+    fi
+    
+    echo ""
+    
+    local OK=0
+    local FAIL=0
+    
+    for DB in $(echo "${!DB_TO_FILE[@]}" | tr ' ' '\n' | sort); do
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${YELLOW}📦 Restaurando: $DB ($(get_database_type_label "$DB"))${NC}"
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        
+        restore_backup "$DB" "$TYPE" "${DB_TO_TS[$DB]}" "" "1" && OK=$((OK + 1)) || FAIL=$((FAIL + 1))
+    done
+    
+    echo ""
+    echo "================================================"
+    echo -e "${BLUE}  RESUMO RESTORE TODOS${NC}"
+    echo "================================================"
+    echo -e "  Bancos restaurados: $OK"
+    echo -e "  Bancos com erro: $FAIL"
+    echo ""
 }
 
 # ============================================
@@ -386,6 +535,7 @@ DATABASE=""
 TYPE="daily"
 TIMESTAMP=""
 TABLES=""
+ALL_DATABASES=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -421,6 +571,10 @@ while [[ $# -gt 0 ]]; do
             TABLES=""
             shift
             ;;
+        --all-databases)
+            ALL_DATABASES=1
+            shift
+            ;;
         *)
             if [ -z "$DATABASE" ]; then
                 DATABASE="$1"
@@ -439,11 +593,14 @@ case $ACTION in
         list_tables_in_backup "$BACKUP_PATH"
         ;;
     *)
-        if [ -z "$DATABASE" ]; then
-            echo -e "${RED}❌ ERRO: Database não informado${NC}"
+        if [ "$ALL_DATABASES" = "1" ]; then
+            restore_all_databases "$TYPE" "$TIMESTAMP"
+        elif [ -z "$DATABASE" ]; then
+            echo -e "${RED}❌ ERRO: Database não informado. Use <database> ou --all-databases${NC}"
             echo ""
             show_help
+        else
+            restore_backup "$DATABASE" "$TYPE" "$TIMESTAMP" "$TABLES"
         fi
-        restore_backup "$DATABASE" "$TYPE" "$TIMESTAMP" "$TABLES"
         ;;
 esac
