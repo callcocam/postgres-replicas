@@ -8,6 +8,8 @@
 *.credentials.txt
 .pgpass
 *.pgpass
+.backup-env
+backup/.backup-env
 
 # Backups
 backups/

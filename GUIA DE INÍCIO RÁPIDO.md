@@ -388,13 +388,91 @@ Todas as senhas são geradas automaticamente e podem ser encontradas em:
 
 ---
 
-## 🎯 Próximos Passos
+---
 
-1. ✅ Configurar backups automáticos (pg_dump via cron)
-2. ✅ Configurar monitoramento (Prometheus + Grafana)
-3. ✅ Adicionar PgBouncer para connection pooling
-4. ✅ Configurar SSL/TLS para conexões
-5. ✅ Implementar estratégia de failover automático
+## 📦 Configurar Backups Automáticos
+
+### Passo 1: Configurar Credenciais S3
+
+```bash
+# Copiar exemplo
+cp /root/postgres-replicas/backup/.backup-env.example /root/.backup-env
+
+# Editar com suas credenciais
+nano /root/.backup-env
+
+# Proteger arquivo
+chmod 600 /root/.backup-env
+```
+
+### Passo 2: Copiar Scripts de Backup
+
+```bash
+cp /root/postgres-replicas/backup/*.sh /root/
+chmod +x /root/*.sh
+```
+
+### Passo 3: Testar Backups
+
+```bash
+# Testar backup horário (tabelas críticas)
+/root/postgres-backup-tables-hours.sh
+
+# Testar backup diário (todas tabelas)
+/root/postgres-backup-tables-full.sh
+```
+
+### Passo 4: Configurar Cron
+
+```bash
+crontab -e
+
+# Adicionar:
+# Backup horário - a cada hora
+0 * * * * source /root/.backup-env && /root/postgres-backup-tables-hours.sh >> /var/log/postgresql-backup-hourly.log 2>&1
+
+# Backup diário - às 3h
+0 3 * * * source /root/.backup-env && /root/postgres-backup-tables-full.sh >> /var/log/postgresql-backup-daily.log 2>&1
+
+# Backup completo (.sql.gz) - às 4h
+0 4 * * * source /root/.backup-env && /root/backup-to-s3.sh >> /var/log/postgresql-backup.log 2>&1
+```
+
+### Estratégia de Backup
+
+| Tipo | Frequência | O que inclui | Retenção |
+|------|------------|--------------|----------|
+| **Horário** | A cada hora | 6 tabelas críticas (planograms, gondolas, sections, shelves, segments, layers) | 48 horas |
+| **Diário** | 3h da manhã | Todas as tabelas por arquivo | 30 dias |
+| **Completo** | 4h da manhã | Banco completo (.sql.gz) | 30 dias |
+
+### Comandos de Restore
+
+```bash
+# Listar backups disponíveis
+./restore-tables-from-s3.sh --list daily
+./restore-tables-from-s3.sh --list hourly
+
+# Restaurar banco completo
+./restore-tables-from-s3.sh plannerate_albert --type daily
+
+# Restaurar apenas algumas tabelas
+./restore-tables-from-s3.sh plannerate_albert --type hourly --tables planograms,gondolas
+```
+
+📚 **Documentação completa:** `backup/README.md`
+
+---
+
+## 🎯 Checklist de Implantação
+
+- [ ] Servidor Primário configurado
+- [ ] Servidor Réplica configurado e sincronizando
+- [ ] Laravel configurado com read/write split
+- [ ] Backups automáticos configurados
+- [ ] Restore testado e funcionando
+- [ ] Monitoramento configurado (opcional)
+- [ ] Alertas configurados (opcional)
 
 ---
 

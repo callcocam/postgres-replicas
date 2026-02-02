@@ -1,0 +1,41 @@
+# ============================================
+# PLANNERATE - Configuração de Backup S3
+# ============================================
+# Copie este arquivo para .backup-env e configure as credenciais
+# cp .backup-env.example /root/.backup-env
+# chmod 600 /root/.backup-env
+
+# Habilitar/desabilitar backup
+export BACKUP_ENABLED="true"
+
+# ============================================
+# DigitalOcean Spaces (ou S3 compatível)
+# ============================================
+export DO_ACCESS_KEY_ID="SUA_ACCESS_KEY"
+export DO_SECRET_ACCESS_KEY="SUA_SECRET_KEY"
+export DO_ENDPOINT="https://sfo3.digitaloceanspaces.com"
+export DO_BUCKET="seu-bucket"
+export DO_REGION="sfo3"
+
+# ============================================
+# PostgreSQL
+# ============================================
+export POSTGRES_HOST="127.0.0.1"
+export POSTGRES_PORT="5432"
+export POSTGRES_USER="postgres"
+export PGPASSWORD="SUA_SENHA_POSTGRES"
+
+# ============================================
+# Databases para backup (separados por espaço)
+# ============================================
+export DATABASES="plannerate_production plannerate_staging"
+
+# ============================================
+# Diretórios e Retenção
+# ============================================
+export BACKUP_DIR="/var/backups/postgresql"
+export RESTORE_DIR="/tmp/pg_restore"
+
+# Retenção de backups
+export RETENTION_DAYS="30"      # Backup diário: manter 30 dias
+export RETENTION_HOURS="48"     # Backup horário: manter 48 horas
