@@ -61,55 +61,49 @@ Os scripts listam todos os bancos (exceto `template0`, `template1`, `postgres`) 
 
 ## ⚡ Instalação Rápida
 
-### 1. Configurar Credenciais
+Os scripts são usados **direto** de `postgres-replicas/backup/` (não é necessário copiar para `/root/`). Na réplica: clone o repositório (ou tenha o pacote disponível), crie `.backup-env` e configure o cron apontando para esta pasta.
+
+### 1. Ter o pacote na réplica
+
+Clone o repositório na réplica (ou copie a pasta do pacote). Exemplo: `/root/postgres-replicas/`. Defina o caminho da pasta backup, por exemplo:
 
 ```bash
-# Copiar exemplo
-cp .backup-env.example /root/.backup-env
-
-# Editar com suas credenciais
-nano /root/.backup-env
-
-# Proteger arquivo
-chmod 600 /root/.backup-env
+BACKUP_DIR=/root/postgres-replicas/backup   # ajuste se o repo estiver em outro path
 ```
 
-### 2. Copiar Scripts
+### 2. Configurar Credenciais
 
 ```bash
-# Copiar para /root
-cp *.sh /root/
-chmod +x /root/*.sh
+cd "$BACKUP_DIR"
+cp .backup-env.example /root/.backup-env
+nano /root/.backup-env   # preencher credenciais S3 e Postgres
+chmod 600 /root/.backup-env
 ```
 
 ### 3. Testar
 
 ```bash
-# Testar backup horário
-/root/postgres-backup-tables-hours.sh
-
-# Testar backup diário
-/root/postgres-backup-tables-full.sh
-
-# Testar backup completo
-/root/backup-to-s3.sh
+source /root/.backup-env
+"$BACKUP_DIR/postgres-backup-tables-hours.sh"
+"$BACKUP_DIR/postgres-backup-tables-full.sh"
+"$BACKUP_DIR/backup-to-s3.sh"
 ```
 
 ### 4. Configurar Cron
 
-```bash
-# Editar cron
-crontab -e
+Cron deve apontar **direto** para os scripts em `postgres-replicas/backup/` (ajuste o path se o repo estiver em outro lugar):
 
-# Adicionar:
+```bash
+crontab -e
+# Adicionar (path fixo; troque /root/postgres-replicas por onde o repo estiver):
 # Backup horário (tabelas críticas) - a cada hora
-0 * * * * source /root/.backup-env && /root/postgres-backup-tables-hours.sh >> /var/log/postgresql-backup-hourly.log 2>&1
+0 * * * * source /root/.backup-env && /root/postgres-replicas/backup/postgres-backup-tables-hours.sh >> /var/log/postgresql-backup-hourly.log 2>&1
 
 # Backup diário completo (todas as tabelas) - às 3h
-0 3 * * * source /root/.backup-env && /root/postgres-backup-tables-full.sh >> /var/log/postgresql-backup-daily.log 2>&1
+0 3 * * * source /root/.backup-env && /root/postgres-replicas/backup/postgres-backup-tables-full.sh >> /var/log/postgresql-backup-daily.log 2>&1
 
 # Backup completo do banco (.sql.gz) - às 4h
-0 4 * * * source /root/.backup-env && /root/backup-to-s3.sh >> /var/log/postgresql-backup.log 2>&1
+0 4 * * * source /root/.backup-env && /root/postgres-replicas/backup/backup-to-s3.sh >> /var/log/postgresql-backup.log 2>&1
 ```
 
 ## 🔄 Estratégia de Backup
@@ -173,7 +167,10 @@ s3://seu-bucket/backups/
 
 ### Listar Backups Disponíveis
 
+Execute a partir da pasta `backup/` (ou use o path completo):
+
 ```bash
+cd /root/postgres-replicas/backup   # ou onde estiver o repo
 # Listar backups horários
 ./restore-tables-from-s3.sh --list hourly
 
@@ -184,6 +181,7 @@ s3://seu-bucket/backups/
 ### Restaurar Backup de Tabelas
 
 ```bash
+cd /root/postgres-replicas/backup
 # Listar backups (mostra principal/cliente por banco)
 ./restore-tables-from-s3.sh --list daily
 ./restore-tables-from-s3.sh --list hourly
@@ -206,6 +204,7 @@ O nome do banco no backup é o mesmo do arquivo; o restore restaura sempre no ba
 ### Restaurar Backup Completo (.sql.gz)
 
 ```bash
+cd /root/postgres-replicas/backup
 # Listar backups disponíveis
 ./restore-from-s3.sh plannerate_production --list
 
@@ -285,7 +284,7 @@ crontab -l
 grep CRON /var/log/syslog | tail -20
 
 # Executar manualmente para ver erros
-source /root/.backup-env && /root/postgres-backup-tables-hours.sh
+source /root/.backup-env && /root/postgres-replicas/backup/postgres-backup-tables-hours.sh
 ```
 
 ## 📈 Boas Práticas

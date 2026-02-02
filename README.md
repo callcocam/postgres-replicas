@@ -14,20 +14,19 @@ postgres-replicas/
 ├── setup-primary.sh              # PRIMÁRIO: setup do servidor primário
 ├── setup-replica.sh              # RÉPLICA: setup de replicação (uma vez)
 ├── GUIA DE INÍCIO RÁPIDO.md      # Guia completo de instalação
-├── backup/                       # RÉPLICA: copiar esta pasta para a réplica
+├── backup/                       # RÉPLICA: scripts usados direto (config à parte)
 │   ├── BACKUP-NA-REPLICA.md      # Guia: configurar backups na réplica
 │   ├── README.md                 # Documentação dos scripts
 │   ├── .backup-env.example       # Exemplo de configuração
 │   ├── backup-to-s3.sh           # Backup completo .sql.gz
 │   ├── postgres-backup-tables-hours.sh   # Backup horário
-│   ├── postgres-backup-tables-full.sh    # Backup diário
+│   ├── postgres-backup-tables-full.sh   # Backup diário
 │   ├── restore-from-s3.sh        # Restore completo
 │   └── restore-tables-from-s3.sh # Restore por tabelas
 └── .credentials.example          # Exemplo de credenciais
 ```
 
-**Separação:** Primário = só instalação. Réplica = instalação + **backups** (cron só na réplica).  
-**Scripts de backup:** Todos em `backup/`; copiar para `/root/` na réplica (ver `backup/BACKUP-NA-REPLICA.md`).
+**Fluxo:** `setup-replica.sh` → só instala a réplica. **Backup** → à parte: clonar o repo na réplica, criar `.backup-env` e configurar o cron apontando para `postgres-replicas/backup/` (scripts usados direto, sem copiar). Ver `backup/BACKUP-NA-REPLICA.md`.
 
 ## ⚡ Quick Start
 
@@ -55,12 +54,7 @@ chmod +x setup-replica.sh
 
 ### 3. Configurar Backups (somente na RÉPLICA)
 
-Backups **não** rodam no primário. Use a pasta `backup/` **na réplica**:
-
-```bash
-# Na réplica: copiar pasta backup/ para /root/, configurar .backup-env e cron
-# Ver: backup/BACKUP-NA-REPLICA.md
-```
+Backups **não** rodam no primário. Na réplica: clonar o repositório, criar `.backup-env` e configurar o cron apontando para `postgres-replicas/backup/` (scripts usados direto). Ver **backup/BACKUP-NA-REPLICA.md**.
 
 ## 🏗️ Arquitetura
 
@@ -112,6 +106,7 @@ sudo -u postgres psql -c "SELECT NOW() - pg_last_xact_replay_timestamp() AS lag;
 ### Listar Backups
 
 ```bash
+cd postgres-replicas/backup
 ./restore-tables-from-s3.sh --list daily
 ./restore-tables-from-s3.sh --list hourly
 ```
@@ -119,6 +114,7 @@ sudo -u postgres psql -c "SELECT NOW() - pg_last_xact_replay_timestamp() AS lag;
 ### Restaurar Banco
 
 ```bash
+cd postgres-replicas/backup
 # Restaurar último backup diário
 ./restore-tables-from-s3.sh plannerate_albert --type daily
 

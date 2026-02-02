@@ -1,6 +1,6 @@
 # Onde usar cada parte do pacote
 
-Separação clara: **Primário** = instalação; **Réplica** = backups.
+Separação clara: **Primário** = instalação; **Réplica** = instalação + backups (config à parte).
 
 ---
 
@@ -19,19 +19,22 @@ Separação clara: **Primário** = instalação; **Réplica** = backups.
 
 ### O que NÃO vai no primário
 
-- **Não** copie a pasta `backup/` para o primário para rodar backups
 - **Não** configure cron de backup no primário  
 → Backups rodam só na réplica
 
 ---
 
-## Servidor RÉPLICA (backups)
+## Servidor RÉPLICA (instalação + backup)
 
-**Use a pasta `backup/` só na réplica.**
+### Instalação da réplica
 
-### Arquivos para a réplica (backups)
+- **setup-replica.sh** → só instala a réplica (PostgreSQL em modo réplica).
 
-Copie **toda a pasta `backup/`** para a réplica (ex.: `/root/`):
+### Backups (configuração à parte)
+
+Os scripts de backup ficam em **postgres-replicas/backup/** e são usados **direto** dessa pasta (não copiar para `/root/`).
+
+**Fluxo:** Na réplica, clonar o repositório (ou ter o pacote disponível) → criar `.backup-env` → configurar o cron apontando para `postgres-replicas/backup/`.
 
 | Arquivo | Uso |
 |---------|-----|
@@ -40,17 +43,17 @@ Copie **toda a pasta `backup/`** para a réplica (ex.: `/root/`):
 | `backup/postgres-backup-tables-full.sh` | Backup diário (todas as tabelas) |
 | `backup/restore-from-s3.sh` | Restore .sql.gz (manual) |
 | `backup/restore-tables-from-s3.sh` | Restore por tabelas (manual) |
-| `backup/.backup-env.example` | Copiar como `.backup-env` e preencher credenciais |
+| `backup/.backup-env.example` | Copiar como `/root/.backup-env` e preencher credenciais |
 
 ### Documentação de backup na réplica
 
-- **`backup/BACKUP-NA-REPLICA.md`** → Guia para configurar backups na réplica
-- **`backup/README.md`** → Detalhes dos scripts e do S3
+- **backup/BACKUP-NA-REPLICA.md** → Guia para configurar backups na réplica
+- **backup/README.md** → Detalhes dos scripts e do S3
 
 ### Resumo
 
-1. **Primário:** instalação com `setup-primary.sh` e `setup-replica.sh` (na réplica), sem cron de backup.
-2. **Réplica:** copiar `backup/` para `/root/`, configurar `.backup-env`, instalar `awscli`, testar scripts e configurar cron conforme `BACKUP-NA-REPLICA.md`.
+1. **Primário:** instalação com `setup-primary.sh`; sem cron de backup.
+2. **Réplica:** `setup-replica.sh` (instalação) + **backup à parte:** clonar repo, criar `.backup-env`, cron apontando para `postgres-replicas/backup/`.
 
 ### Backup/Restore (sem nomes fixos)
 

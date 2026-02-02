@@ -215,25 +215,25 @@ PGPASSWORD="xxx" psql -h 127.0.0.1 -p 6432 -U postgres pgbouncer -c "SHOW STATS;
 - ✅ Restore com confirmação
 - ✅ Desconexão automática de usuários no restore
 
-#### Comandos Úteis (na réplica, após copiar `backup/*.sh` para `/root/`)
+#### Comandos Úteis (na réplica, a partir de `postgres-replicas/backup/`)
 ```bash
 # Backup manual
-source /root/.backup-env && bash /root/backup-to-s3.sh
+source /root/.backup-env && /root/postgres-replicas/backup/backup-to-s3.sh
 
 # Listar backups (completo .sql.gz)
-bash /root/restore-from-s3.sh plannerate_production --list
+/root/postgres-replicas/backup/restore-from-s3.sh plannerate_production --list
 
 # Restaurar último backup (completo)
-bash /root/restore-from-s3.sh plannerate_production
+/root/postgres-replicas/backup/restore-from-s3.sh plannerate_production
 
 # Restaurar backup específico
-bash /root/restore-from-s3.sh plannerate_production 20260113_012050
+/root/postgres-replicas/backup/restore-from-s3.sh plannerate_production 20260113_012050
 
 # Listar/restaurar backups por tabelas: ver backup/README.md
 ```
 
 #### Documentação
-- ✅ `BACKUP-S3.md` - Guia completo de uso e configuração
+- ✅ `backup/README.md` e `backup/BACKUP-NA-REPLICA.md` - Guia de backup e configuração na réplica
 - ✅ Exemplos de comandos
 - ✅ Troubleshooting
 - ✅ Configuração de staging (desabilitado por padrão)
@@ -326,7 +326,7 @@ bash /root/restore-from-s3.sh plannerate_production 20260113_012050
 4. ✅ `STATUS-PROJETO.md` - Este documento (status atual)
 5. ✅ `PGBOUNCER.md` - Documentação técnica do PgBouncer
 6. ✅ `PGBOUNCER-INSTALACAO.md` - Guia completo de instalação
-7. ✅ `BACKUP-S3.md` - Guia completo de backup/restore S3
+7. ✅ `backup/README.md` e `backup/BACKUP-NA-REPLICA.md` - Backup/restore e configuração na réplica
 8. ✅ Scripts shell comentados e documentados
 
 ### Arquivos de Configuração
@@ -335,7 +335,7 @@ bash /root/restore-from-s3.sh plannerate_production 20260113_012050
 3. ✅ `.env.production` e `.env.staging` - Variáveis de ambiente
 4. ✅ Scripts de setup PostgreSQL (primary + replica)
 5. ✅ `/root/.backup-env` - Configuração de backup S3 (na réplica)
-6. ✅ Scripts em `backup/` (copiar para `/root/` na réplica): backup-to-s3.sh, restore-from-s3.sh, postgres-backup-tables-*.sh, restore-tables-from-s3.sh
+6. ✅ Scripts em `backup/` (usados direto de postgres-replicas/backup/ na réplica): backup-to-s3.sh, restore-from-s3.sh, postgres-backup-tables-*.sh, restore-tables-from-s3.sh
 
 ---
 

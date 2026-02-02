@@ -4,6 +4,15 @@ Guia para rodar os backups no servidor **réplica** (não no primário).
 
 ---
 
+## Fluxo geral
+
+- **setup-replica.sh** → só instala a réplica (PostgreSQL em modo réplica).
+- **Backup** → configurado à parte: clonar o repositório na réplica, criar `.backup-env` e configurar o cron (ou apontar direto para `postgres-replicas/backup/`).
+
+Os scripts ficam em `postgres-replicas/backup/` e são usados **direto** dessa pasta (não é necessário copiar para `/root/`).
+
+---
+
 ## Por que na réplica?
 
 - Não sobrecarrega o primário
@@ -12,28 +21,29 @@ Guia para rodar os backups no servidor **réplica** (não no primário).
 
 ---
 
-## 1. Copiar arquivos para a réplica
+## 1. Ter o pacote na réplica
 
-**De onde você tiver o pacote** (primário, repo clonado, etc.):
+Na réplica, clone o repositório (ou copie a pasta do pacote). Exemplo:
 
 ```bash
-# Troque IP_REPLICA pelo IP da sua réplica (ex: 72.60.240.151)
-IP_REPLICA=72.60.240.151
-
-# Copiar toda a pasta backup/ para /root/ na réplica
-scp backup/*.sh root@$IP_REPLICA:/root/
-scp backup/.backup-env.example root@$IP_REPLICA:/root/
-
-# Na réplica: renomear e configurar
-ssh root@$IP_REPLICA "mv /root/.backup-env.example /root/.backup-env && chmod 600 /root/.backup-env"
-ssh root@$IP_REPLICA "chmod +x /root/*.sh"
+# Na réplica
+cd /root
+git clone https://github.com/SEU_ORG/postgres-replicas.git
+# ou: copie a pasta postgres-replicas para /root/
 ```
 
-**Importante:** Edite `/root/.backup-env` na réplica com as credenciais reais (S3 + senha Postgres). Use o mesmo `.backup-env` do primário se já tiver; só garanta que `POSTGRES_HOST=127.0.0.1`.
+Os scripts de backup ficam em `postgres-replicas/backup/`.
 
 ---
 
-## 2. Ajustar na réplica
+## 2. Configurar credenciais (.backup-env)
+
+```bash
+cd /root/postgres-replicas/backup
+cp .backup-env.example /root/.backup-env
+nano /root/.backup-env   # preencher credenciais S3 e Postgres
+chmod 600 /root/.backup-env
+```
 
 O `.backup-env` na réplica deve ter:
 
@@ -45,7 +55,6 @@ O `.backup-env` na réplica deve ter:
 ## 3. Instalar dependências na réplica
 
 ```bash
-# Na réplica
 apt update && apt install -y awscli
 which pg_dump   # já vem com PostgreSQL
 ```
@@ -55,34 +64,34 @@ which pg_dump   # já vem com PostgreSQL
 ## 4. Testar backup na réplica
 
 ```bash
-# Na réplica
 source /root/.backup-env
 
-/root/backup-to-s3.sh
-/root/postgres-backup-tables-hours.sh
-/root/postgres-backup-tables-full.sh
+/root/postgres-replicas/backup/backup-to-s3.sh
+/root/postgres-replicas/backup/postgres-backup-tables-hours.sh
+/root/postgres-replicas/backup/postgres-backup-tables-full.sh
 ```
 
-Se os três rodarem sem erro, está ok.
+Se os três rodarem sem erro, está ok. (Ajuste o path se o repo estiver em outro lugar.)
 
 ---
 
 ## 5. Configurar cron na réplica
 
-**Na réplica:**
+Cron deve apontar **direto** para `postgres-replicas/backup/`:
 
 ```bash
 crontab -e
 ```
 
-Adicionar:
+Adicionar (ajuste o path se o repo não estiver em `/root/postgres-replicas`):
 
 ```cron
 # Backups na RÉPLICA (não rodar no primário)
+# Scripts usados direto de postgres-replicas/backup/
 
-0 * * * * source /root/.backup-env && /root/postgres-backup-tables-hours.sh >> /var/log/postgresql-backup-hourly.log 2>&1
-0 3 * * * source /root/.backup-env && /root/postgres-backup-tables-full.sh >> /var/log/postgresql-backup-daily.log 2>&1
-0 4 * * * source /root/.backup-env && /root/backup-to-s3.sh >> /var/log/postgresql-backup.log 2>&1
+0 * * * * source /root/.backup-env && /root/postgres-replicas/backup/postgres-backup-tables-hours.sh >> /var/log/postgresql-backup-hourly.log 2>&1
+0 3 * * * source /root/.backup-env && /root/postgres-replicas/backup/postgres-backup-tables-full.sh >> /var/log/postgresql-backup-daily.log 2>&1
+0 4 * * * source /root/.backup-env && /root/postgres-replicas/backup/backup-to-s3.sh >> /var/log/postgresql-backup.log 2>&1
 ```
 
 ---
@@ -113,9 +122,9 @@ tail -f /var/log/postgresql-backup.log
 
 ## Checklist
 
-- [ ] Pasta `backup/` copiada para a réplica em `/root/`
-- [ ] `.backup-env` configurado e com permissão 600
+- [ ] Repositório (ou pasta do pacote) disponível na réplica em `postgres-replicas/backup/`
+- [ ] `.backup-env` configurado em `/root/.backup-env` e com permissão 600
 - [ ] `awscli` instalado na réplica
-- [ ] Teste manual dos 3 scripts
-- [ ] Cron configurado na réplica
+- [ ] Teste manual dos 3 scripts de backup
+- [ ] Cron configurado na réplica apontando para `postgres-replicas/backup/*.sh`
 - [ ] **Backups não rodam no primário** (sem cron de backup no primário)
